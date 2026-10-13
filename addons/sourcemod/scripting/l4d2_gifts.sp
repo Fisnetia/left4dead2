@@ -7,17 +7,14 @@
 #include <left4dhooks>
 #include <l4d2_weapons>
 #include <multicolors>
-#tryinclude <perkmod2>
 
-#if !defined _perkmod2_included_
-	native int perkmod2_IsEnable_SurvivorPrimary();
-	native int perkmod2_IsEnable_SurvivorPrimary_ChristmasGift();
-	native int perkmod2_IsClientConfirm(int client);
-	native int perkmod2_IsClientSelect_SurvivorPrimary_ChristmasGift(int client);
-	native int perkmod2_IsExist_SurvivorPrimary_ChristmasGift();
+#undef REQUIRE_PLUGIN
+#tryinclude <clear_weapon_drop>
+#if !defined _clear_weapon_drop_included_
+	native void L4D_RemoveWeaponOnGround(int weapon, float time = -1.0);
 #endif
 
-#define PLUGIN_VERSION		"3.5-2024/5/5"
+#define PLUGIN_VERSION		"3.6-2026/4/20"
 
 public Plugin myinfo = 
 {
@@ -40,29 +37,14 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 		return APLRes_SilentFailure;
 	}
 
-	MarkNativeAsOptional("perkmod2_IsEnable_SurvivorPrimary");
-	MarkNativeAsOptional("perkmod2_IsEnable_SurvivorPrimary_ChristmasGift");
-	MarkNativeAsOptional("perkmod2_IsClientConfirm");
-	MarkNativeAsOptional("perkmod2_IsClientSelect_SurvivorPrimary_ChristmasGift");
-	MarkNativeAsOptional("perkmod2_IsExist_SurvivorPrimary_ChristmasGift");
+	MarkNativeAsOptional("L4D_RemoveWeaponOnGround");
 	
+	CreateNative("L4D2_Gifts_DropGift", Native_DropGift);
+	RegPluginLibrary("l4d2_gifts");
+
 	ZC_TANK = 8;
 	bLate = late;
 	return APLRes_Success; 
-}
-
-bool g_bAvailable_perkmod2;
-public void OnAllPluginsLoaded()
-{
-	g_bAvailable_perkmod2 = LibraryExists("perkmod2");
-}
-public void OnLibraryAdded(const char[] name)
-{
-	g_bAvailable_perkmod2 = LibraryExists("perkmod2");
-}
-public void OnLibraryRemoved(const char[] name)
-{
-	g_bAvailable_perkmod2 = LibraryExists("perkmod2");
 }
 
 #define MAXENTITIES                   2048
@@ -79,26 +61,25 @@ public void OnLibraryRemoved(const char[] name)
 #define TEAM_SURVIVOR		2
 #define TEAM_INFECTED		3
 
-//WeaponName/AmmoOffset/AmmoGive
-static char weapon_ammo[][3][64] =
+static char g_sOfficialWeaponClassName[][64] =
 {
-	{"weapon_smg",		 				"5", 	"250"},
-	{"weapon_pumpshotgun",				"7", 	"40"},
-	{"weapon_rifle",					"3", 	"200"},
-	{"weapon_autoshotgun",				"8", 	"50"},
-	{"weapon_hunting_rifle",			"9", 	"75"},
-	{"weapon_smg_silenced",				"5", 	"250"},
-	{"weapon_smg_mp5", 	 				"5", 	"250"},
-	{"weapon_shotgun_chrome",	 		"7", 	"40"},
-	{"weapon_rifle_ak47",  				"3",	"200"},
-	{"weapon_rifle_desert",				"3", 	"200"},
-	{"weapon_sniper_military",			"10", 	"90"},
-	{"weapon_grenade_launcher", 	 	"17", 	"15"},
-	{"weapon_rifle_sg552",	 			"3", 	"200"},
-	{"weapon_rifle_m60",  				"6",	"200"},
-	{"weapon_sniper_awp", 	 			"10", 	"80"},
-	{"weapon_sniper_scout",	 			"10", 	"80"},
-	{"weapon_shotgun_spas",  			"8",	"50"}
+	"weapon_smg",
+	"weapon_smg_silenced",
+	"weapon_smg_mp5",
+	"weapon_pumpshotgun",
+	"weapon_shotgun_chrome",
+	"weapon_autoshotgun",
+	"weapon_shotgun_spas",
+	"weapon_rifle",
+	"weapon_rifle_ak47",
+	"weapon_rifle_desert",
+	"weapon_rifle_sg552",
+	"weapon_hunting_rifle",
+	"weapon_sniper_military",
+	"weapon_sniper_awp",
+	"weapon_sniper_scout",
+	"weapon_grenade_launcher",
+	"weapon_rifle_m60",
 };
 
 #define	MAX_WEAPONS		30
@@ -142,18 +123,23 @@ int ColorCyan[3], ColorBlue[3], ColorGreen[3], ColorPink[3], ColorRed[3],
 
 #define ENTITY_SAFE_LIMIT 2000 //don't spawn boxes when it's index is above this
 
+ConVar g_hAmmoRifle, g_hAmmoSmg, g_hAmmoHunting, g_hAmmoGL, g_hAmmoM60, g_hAmmoSniper, g_hAmmoShotgun, g_hAmmoAutoShotgun;
+int g_iAmmoRifle, g_iAmmoSmg, g_iAmmoHunting, g_iAmmoGL, g_iAmmoM60, g_iAmmoSniper, g_iAmmoShotgun, g_iAmmoAutoShotgun;
+
 ConVar g_hCvar_gift_enable, g_hCvar_gift_life, g_hCvar_gift_chance,
 	g_hCvar_special_gift_chance,
 	g_hCvar_gift_infected_hp, g_hCvar_special_gift_infected_hp,
 	g_hCvar_gift_Announce, g_hCvar_blockSwitch,
-	g_hCvarStandSoundFile, g_hCvarSpecialSoundFile;
+	g_hCvarStandSoundFile, g_hCvarSpecialSoundFile, g_hCvarConfigFile;
 
 bool g_bGiftEnable, g_bCvarBlockSwitch;
 float g_fGiftLife;
 int g_iGiftChance, g_iSpecialGiftChance,
 	g_iGiftHP, g_iSpecialGiftHP;
 int g_iCvarAnnounce;
-char g_sCvarStandSoundFile[256], g_sCvarSpecialSoundFile[256];
+char g_sCvarStandSoundFile[PLATFORM_MAX_PATH], 
+	g_sCvarSpecialSoundFile[PLATFORM_MAX_PATH], 
+	g_sCvarConfigFile[PLATFORM_MAX_PATH];
 
 char g_sModel[MAX_GIFTS][MAX_STRING_WIDTH];
 char g_sType[MAX_GIFTS][10];
@@ -168,9 +154,11 @@ int g_iGiftGlowRange[MAX_GIFTS],
 int g_iGifType[MAXENTITIES + 1];
 
 char sPath_gifts[PLATFORM_MAX_PATH];
-int g_iCountGifts;
-int g_iOffset_Incapacitated;        // Used to check if tank is dying
-int ammoOffset;	
+int 
+	g_iCountGifts,
+	g_iOffset_Incapacitated,        // Used to check if tank is dying
+	g_iOffsetAmmo,
+	g_iPrimaryAmmoType;
 
 bool 
 	g_bGiftGlowEnable[MAX_GIFTS],
@@ -180,11 +168,19 @@ bool
 	g_bHooked[MAXPLAYERS+1],
 	g_bMapStart;
 
+enum struct CWeaponAmmoData
+{
+	char m_sWeaponClassName[64];
+	int m_iGive;
+	int m_iMaxLimit;
+}
+
 StringMap 
-	g_smItemsToTranslation;
+	g_smItemsToTranslation,
+	g_smWeaponAmmoData,
+	g_smWeaponAmmoCvar;
 
 ArrayList 
-	g_aMapMeleeTable,
 	g_aStandItemsList,
 	g_aSpecialItemsList,
 	g_aGiftModelStandard,
@@ -199,21 +195,41 @@ char
 public void OnPluginStart()
 {
 	LoadTranslations("l4d2_gifts.phrases");
-	BuildPath(Path_SM, sPath_gifts, PLATFORM_MAX_PATH, "data/l4d2_gifts.cfg");
 
-	ammoOffset = FindSendPropInfo("CCSPlayer", "m_iAmmo");
+	g_iOffsetAmmo = FindSendPropInfo("CTerrorPlayer", "m_iAmmo");
+	g_iPrimaryAmmoType = FindSendPropInfo("CBaseCombatWeapon", "m_iPrimaryAmmoType");
 	g_iOffset_Incapacitated = FindSendPropInfo("Tank", "m_isIncapacitated");
 
-	g_hCvar_gift_enable	 				= CreateConVar( "l4d2_gifts_enabled",					 	"1", 	"Enable gifts 0: Disable, 1: Enable", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hCvar_gift_life 					= CreateConVar( "l4d2_gifts_gift_life",					 	"30",	"How long the gift stay on ground (seconds)", FCVAR_NOTIFY, true, 0.0);
-	g_hCvar_gift_chance 				= CreateConVar( "l4d2_gifts_chance_standard", 			 	"50",	"Chance (%) of infected drop special standard gift.", FCVAR_NOTIFY, true, 1.0, true, 100.0);
-	g_hCvar_special_gift_chance 		= CreateConVar( "l4d2_gifts_chance_special", 			 	"100",	"Chance (%) of tank and witch drop second special gift.", FCVAR_NOTIFY, true, 1.0, true, 100.0);
-	g_hCvar_gift_infected_hp 			= CreateConVar( "l4d2_gifts_infected_reward_hp_standard", 	"200",	"Increase Infected health if they pick up gift. (0=Off)", FCVAR_NOTIFY, true, 0.0);
-	g_hCvar_special_gift_infected_hp 	= CreateConVar( "l4d2_gifts_infected_reward_hp_special",	"400",	"Increase Infected health if they pick up special gift. (0=Off)", FCVAR_NOTIFY, true, 0.0);
-	g_hCvar_gift_Announce 				= CreateConVar( "l4d2_gifts_announce_type",				 	"3",	"Notify Server who pickes up gift, and what the gift reward is. (0: Disable, 1:In chat, 2: In Hint Box, 3: In center text)", FCVAR_NOTIFY, true, 0.0, true, 3.0);
-	g_hCvar_blockSwitch 				= CreateConVar( "l4d2_gifts_block_switch",				 	"0",	"If 1, prevent survivors from switching into new weapons and items when they open gifts", FCVAR_NOTIFY, true, 0.0);
+	g_hAmmoRifle =				FindConVar("ammo_assaultrifle_max");
+	g_hAmmoSmg =				FindConVar("ammo_smg_max");
+	g_hAmmoHunting =			FindConVar("ammo_huntingrifle_max");
+	g_hAmmoGL =					FindConVar("ammo_grenadelauncher_max");
+	g_hAmmoM60 =				FindConVar("ammo_m60_max");
+	g_hAmmoSniper =				FindConVar("ammo_sniperrifle_max");
+	g_hAmmoShotgun =			FindConVar("ammo_shotgun_max");
+	g_hAmmoAutoShotgun =		FindConVar("ammo_autoshotgun_max");
+	
+	GetOfficialCvars();
+	g_hAmmoRifle.AddChangeHook(OnConVarChanged_Official);
+	g_hAmmoSmg.AddChangeHook(OnConVarChanged_Official);
+	g_hAmmoHunting.AddChangeHook(OnConVarChanged_Official);
+	g_hAmmoGL.AddChangeHook(OnConVarChanged_Official);
+	g_hAmmoM60.AddChangeHook(OnConVarChanged_Official);
+	g_hAmmoSniper.AddChangeHook(OnConVarChanged_Official);
+	g_hAmmoShotgun.AddChangeHook(OnConVarChanged_Official);
+	g_hAmmoAutoShotgun.AddChangeHook(OnConVarChanged_Official);
+
+	g_hCvar_gift_enable	 				= CreateConVar( "l4d2_gifts_enabled",					 	"1", 		"Enable gifts 0: Disable, 1: Enable", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hCvar_gift_life 					= CreateConVar( "l4d2_gifts_gift_life",					 	"30",		"How long the gift stay on ground (seconds)", FCVAR_NOTIFY, true, 0.0);
+	g_hCvar_gift_chance 				= CreateConVar( "l4d2_gifts_chance_standard", 			 	"50",		"Chance (%) of infected drop special standard gift.", FCVAR_NOTIFY, true, 1.0, true, 100.0);
+	g_hCvar_special_gift_chance 		= CreateConVar( "l4d2_gifts_chance_special", 			 	"100",		"Chance (%) of tank and witch drop second special gift.", FCVAR_NOTIFY, true, 1.0, true, 100.0);
+	g_hCvar_gift_infected_hp 			= CreateConVar( "l4d2_gifts_infected_reward_hp_standard", 	"200",		"Increase Infected health if they pick up gift. (0=Off)", FCVAR_NOTIFY, true, 0.0);
+	g_hCvar_special_gift_infected_hp 	= CreateConVar( "l4d2_gifts_infected_reward_hp_special",	"400",		"Increase Infected health if they pick up special gift. (0=Off)", FCVAR_NOTIFY, true, 0.0);
+	g_hCvar_gift_Announce 				= CreateConVar( "l4d2_gifts_announce_type",				 	"3",		"Notify Server who pickes up gift, and what the gift reward is. (0: Disable, 1:In chat, 2: In Hint Box, 3: In center text)", FCVAR_NOTIFY, true, 0.0, true, 3.0);
+	g_hCvar_blockSwitch 				= CreateConVar( "l4d2_gifts_drop_item",				 		"0",		"When survivors get new weapons/items from gifts, 0=Equip new weapon/item, 1=Drop on the ground", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	g_hCvarStandSoundFile 				= CreateConVar( "l4d2_gifts_soundfile_standard", 			"level/loud/climber.wav", 	"Standard gift - pick up sound file (relative to to sound/, empty=disable)", FCVAR_NOTIFY);
 	g_hCvarSpecialSoundFile 			= CreateConVar( "l4d2_gifts_soundfile_special", 			"level/gnomeftw.wav", 		"Special gift - pick up sound file (relative to to sound/, empty=disable)", FCVAR_NOTIFY);
+	g_hCvarConfigFile 					= CreateConVar(	"l4d2_gifts_config_file", 					"l4d2_gifts.cfg", "Configuration file name in data folder (e.g., l4d2_gifts.cfg)", FCVAR_NOTIFY);
 	AutoExecConfig(true, "l4d2_gifts");
 
 	GetCvars();
@@ -227,6 +243,7 @@ public void OnPluginStart()
 	g_hCvar_blockSwitch.AddChangeHook(Cvar_Changed);
 	g_hCvarStandSoundFile.AddChangeHook(Cvar_Changed);
 	g_hCvarSpecialSoundFile.AddChangeHook(Cvar_Changed);
+	g_hCvarConfigFile.AddChangeHook(Cvar_Changed);
 
 	HookEvent("round_start", Event_RoundStart);
 	HookEvent("round_end", Event_RoundEnd);
@@ -312,9 +329,67 @@ void LateLoad()
     }
 }
 
+bool g_bclear_weapon_drop_Available;
+public void OnAllPluginsLoaded()
+{
+	g_bclear_weapon_drop_Available = LibraryExists("clear_weapon_drop");
+}
+
+public void OnLibraryRemoved(const char[] name)
+{
+	g_bclear_weapon_drop_Available = LibraryExists("clear_weapon_drop");
+}
+
+public void OnLibraryAdded(const char[] name)
+{
+	g_bclear_weapon_drop_Available = LibraryExists("clear_weapon_drop");
+}
+
+void OnConVarChanged_Official(Handle convar, const char[] oldValue, const char[] newValue)
+{
+	GetOfficialCvars();
+}
+
+void GetOfficialCvars()
+{
+	g_iAmmoRifle		= g_hAmmoRifle.IntValue;
+	g_iAmmoSmg			= g_hAmmoSmg.IntValue;
+	g_iAmmoHunting		= g_hAmmoHunting.IntValue;
+	g_iAmmoGL			= g_hAmmoGL.IntValue;
+	g_iAmmoM60			= g_hAmmoM60.IntValue;
+	g_iAmmoSniper		= g_hAmmoSniper.IntValue;
+	g_iAmmoShotgun		= g_hAmmoShotgun.IntValue;
+	g_iAmmoAutoShotgun	= g_hAmmoAutoShotgun.IntValue;
+
+	delete g_smWeaponAmmoCvar;
+	g_smWeaponAmmoCvar = new StringMap();
+	g_smWeaponAmmoCvar.SetValue("weapon_smg", g_iAmmoSmg);
+	g_smWeaponAmmoCvar.SetValue("weapon_smg_silenced", g_iAmmoSmg);
+	g_smWeaponAmmoCvar.SetValue("weapon_smg_mp5", g_iAmmoSmg);
+	g_smWeaponAmmoCvar.SetValue("weapon_pumpshotgun", g_iAmmoShotgun);
+	g_smWeaponAmmoCvar.SetValue("weapon_shotgun_chrome", g_iAmmoShotgun);
+	g_smWeaponAmmoCvar.SetValue("weapon_autoshotgun", g_iAmmoAutoShotgun);
+	g_smWeaponAmmoCvar.SetValue("weapon_shotgun_spas", g_iAmmoAutoShotgun);
+	g_smWeaponAmmoCvar.SetValue("weapon_rifle", g_iAmmoRifle);
+	g_smWeaponAmmoCvar.SetValue("weapon_rifle_ak47", g_iAmmoRifle);
+	g_smWeaponAmmoCvar.SetValue("weapon_rifle_desert", g_iAmmoRifle);
+	g_smWeaponAmmoCvar.SetValue("weapon_rifle_sg552", g_iAmmoRifle);
+	g_smWeaponAmmoCvar.SetValue("weapon_hunting_rifle", g_iAmmoHunting);
+	g_smWeaponAmmoCvar.SetValue("weapon_sniper_military", g_iAmmoSniper);
+	g_smWeaponAmmoCvar.SetValue("weapon_sniper_awp", g_iAmmoSniper);
+	g_smWeaponAmmoCvar.SetValue("weapon_sniper_scout", g_iAmmoSniper);
+	g_smWeaponAmmoCvar.SetValue("weapon_grenade_launcher", g_iAmmoGL);
+	g_smWeaponAmmoCvar.SetValue("weapon_rifle_m60", g_iAmmoM60);
+}
+
 void Cvar_Changed(ConVar convar, const char[] oldValue, const char[] newValue)
 {
 	GetCvars();
+
+	if (convar == g_hCvarConfigFile)
+	{
+		LoadConfigGifts();
+	}
 }
 
 void GetCvars()
@@ -330,6 +405,7 @@ void GetCvars()
 	g_bCvarBlockSwitch = g_hCvar_blockSwitch.BoolValue;
 	g_hCvarStandSoundFile.GetString(g_sCvarStandSoundFile, sizeof(g_sCvarStandSoundFile));
 	g_hCvarSpecialSoundFile.GetString(g_sCvarSpecialSoundFile, sizeof(g_sCvarSpecialSoundFile));
+	g_hCvarConfigFile.GetString(g_sCvarConfigFile, sizeof(g_sCvarConfigFile));
 
 	if(g_bMapStart)
 	{
@@ -426,14 +502,8 @@ Action Command_ReloadGift(int client, int args)
 
 void LoadConfigGifts()
 {
-	KeyValues hFile = new KeyValues("Gifts");
-	
-	if(!hFile.ImportFromFile(sPath_gifts) )
-	{
-		SetFailState("Cannot load the data file 'data/l4d2_gifts.cfg'");
-		delete hFile;
-		return;
-	}
+	delete g_smWeaponAmmoData;
+	g_smWeaponAmmoData = new StringMap();
 
 	delete g_aStandItemsList;
 	g_aStandItemsList = new ArrayList(ByteCountToCells(64));
@@ -446,6 +516,16 @@ void LoadConfigGifts()
 
 	delete g_aGiftModelSpecial;
 	g_aGiftModelSpecial = new ArrayList();
+
+	KeyValues hFile = new KeyValues("Gifts");
+	
+	BuildPath(Path_SM, sPath_gifts, PLATFORM_MAX_PATH, "data/%s", g_sCvarConfigFile);
+	if(!hFile.ImportFromFile(sPath_gifts) )
+	{
+		SetFailState("Cannot load the data file 'data/l4d2_gifts.cfg'");
+		delete hFile;
+		return;
+	}
 
 	char sNumber[4];
 	if( hFile.JumpToKey("models") )
@@ -575,9 +655,8 @@ void LoadConfigGifts()
 				{
 					if(strcmp(sName, "weapon_melee", false) == 0)
 					{
-						hFile.GetString("melee", sName, sizeof(sName), "");
-						if(strlen(sName) > 0 && g_aMapMeleeTable.FindString(sName) > -1) 
-							g_aSpecialItemsList.PushString(sName);
+						FormatEx(sName, sizeof(sName), "%s", g_sMeleeClass[GetRandomInt(0, g_iMeleeClassCount-1)]);
+						g_aSpecialItemsList.PushString(sName);
 					}
 					else if(strcmp(sName, "hp", false) == 0)
 					{
@@ -621,10 +700,19 @@ void LoadConfigGifts()
 
 	if( hFile.JumpToKey("weapon_ammo") )
 	{
-		int size = sizeof(weapon_ammo);
+		int size = sizeof(g_sOfficialWeaponClassName);
 		for( int index = 0 ; index < size ; ++index )
 		{
-			hFile.GetString(weapon_ammo[index][0], weapon_ammo[index][2], sizeof(weapon_ammo[][]), weapon_ammo[index][2]);
+			if(hFile.JumpToKey(g_sOfficialWeaponClassName[index]))
+			{
+				CWeaponAmmoData cWeaponAmmoData;
+				FormatEx(cWeaponAmmoData.m_sWeaponClassName, sizeof(cWeaponAmmoData.m_sWeaponClassName), g_sOfficialWeaponClassName[index]);
+				cWeaponAmmoData.m_iGive = hFile.GetNum("give", 0);
+				cWeaponAmmoData.m_iMaxLimit = hFile.GetNum("max_limit", -1);
+				g_smWeaponAmmoData.SetArray(g_sOfficialWeaponClassName[index], cWeaponAmmoData, sizeof(CWeaponAmmoData));
+
+				hFile.GoBack();
+			}
 		}
 
 		hFile.GoBack();
@@ -662,11 +750,11 @@ void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 	
 	int victim = GetClientOfUserId(event.GetInt("userid"));
 	int attacker = GetClientOfUserId(event.GetInt("attacker"));
+	
 	if (attacker != victim && IsValidClient(victim) && GetClientTeam(victim) == 3)
 	{
 		if(GetZombieClass(victim) == 8)
 		{
-			if (g_bAvailable_perkmod2) if (!perkmod2_IsExist_SurvivorPrimary_ChristmasGift()) return;
 			if (GetRandomInt(1, 100) <= g_iSpecialGiftChance)
 			{
 				DropGift(victim, TYPE_SPECIAL);
@@ -674,11 +762,6 @@ void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 		}
 		else
 		{
-			if (g_bAvailable_perkmod2) if (
-				!perkmod2_IsEnable_SurvivorPrimary() ||
-				!perkmod2_IsEnable_SurvivorPrimary_ChristmasGift() ||
-				!perkmod2_IsClientConfirm(attacker) ||
-				!perkmod2_IsClientSelect_SurvivorPrimary_ChristmasGift(attacker)) return;
 			if (GetRandomInt(1, 100) <= g_iGiftChance)
 			{
 				DropGift(victim, TYPE_STANDARD);
@@ -695,7 +778,7 @@ void OnWitchKilled(Event event, const char[] name, bool dontBroadcast)
 	if(g_bIsDoorOpen_LockDown|| g_bFinalHasStart)
 		return;	
 
-	if (g_bAvailable_perkmod2) if (!perkmod2_IsExist_SurvivorPrimary_ChristmasGift()) return;
+	//int attacker = GetClientOfUserId(event.GetInt("userid"));
 	int witch = event.GetInt("witchid");
 	if (GetRandomInt(1, 100) <= g_iSpecialGiftChance)
 	{
@@ -893,22 +976,32 @@ void DropGift(int client, int type = TYPE_STANDARD)
 	}
 }
 
+// native bool L4D2_Gifts_DropGift(int entity, int type = 1);
+// Spawn a gift at the position of "entity" (a client, or any entity such as a witch).
+// "type": 1 = standard gift, 2 = special gift.
+any Native_DropGift(Handle plugin, int numParams)
+{
+	int entity = GetNativeCell(1);
+	int type = (numParams >= 2) ? GetNativeCell(2) : TYPE_STANDARD;
+
+	if( type != TYPE_STANDARD && type != TYPE_SPECIAL )
+		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid gift type %d (1 = standard, 2 = special)", type);
+
+	DropGift(entity, type);
+
+	return true;
+}
+
 Action ColdDown( Handle timer, any ref)
 {
 	int gift;
 	if (ref && (gift = EntRefToEntIndex(ref)) != INVALID_ENT_REFERENCE)
 	{
-		SDKHook(gift, SDKHook_TouchPost, OnTouchPost);
 		SDKHook(gift, SDKHook_UsePost, OnUsePost);
 	}
 
 	return Plugin_Continue;
 }
-
-void OnTouchPost(int gift, int client)
-{
-	TryOpenGift(gift, client);
-} 
 
 void OnUsePost(int gift, int client, int caller, UseType type, float value)
 {
@@ -1011,7 +1104,7 @@ void TryOpenGift(int gift, int client)
 
 Action WeaponCanUse(int client, int weapon)
 {
-	if(!g_bGiftEnable || !g_bCvarBlockSwitch) return Plugin_Continue;
+	if(!g_bCvarBlockSwitch) return Plugin_Continue;
 
 	if(IsClientInGame(client) && GetClientTeam(client) == 2)
 	{
@@ -1027,13 +1120,8 @@ Action WeaponCanUse(int client, int weapon)
 				wepid == WEPID_COLA_BOTTLES ||
 				wepid == WEPID_GNOME_CHOMPSKI) 
 			{
-				Event hEvent = CreateEvent("weapon_drop");
-				if( hEvent != null )
-				{
-					hEvent.SetInt("userid", GetClientUserId(client));
-					hEvent.SetInt("propid", weapon);
-					hEvent.Fire();
-				}
+				if(g_bclear_weapon_drop_Available) L4D_RemoveWeaponOnGround(weapon, _);
+
 				return Plugin_Handled;
 			}
 
@@ -1042,13 +1130,7 @@ Action WeaponCanUse(int client, int weapon)
 
 			if(GetPlayerWeaponSlot(client, slot) == -1) return Plugin_Continue;
 
-			Event hEvent = CreateEvent("weapon_drop");
-			if( hEvent != null )
-			{
-				hEvent.SetInt("userid", GetClientUserId(client));
-				hEvent.SetInt("propid", weapon);
-				hEvent.Fire();
-			}
+			if(g_bclear_weapon_drop_Available) L4D_RemoveWeaponOnGround(weapon, _);
 
 			return Plugin_Handled;
 		}
@@ -1103,7 +1185,7 @@ stock int GetURandomIntRange(int min, int max)
 
 void PlaySoundAroundClient(int client,char[] sSoundName)
 {
-	EmitSoundToAll(sSoundName, client, SNDCHAN_AUTO, SNDLEVEL_AIRCRAFT, SND_NOFLAGS, SNDVOL_NORMAL, SNDPITCH_NORMAL, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
+	EmitSoundToAll(sSoundName, client, SNDCHAN_AUTO, SNDLEVEL_NORMAL, SND_NOFLAGS, SNDVOL_NORMAL, SNDPITCH_NORMAL, -1, NULL_VECTOR, NULL_VECTOR, true, 0.0);
 }
 
 bool IsPlayerGhost (int client)
@@ -1130,20 +1212,51 @@ stock void GiveUpgrade(int client, char[] name)
 	SetCommandFlags("upgrade_add", flags);
 }
 
-stock void GiveClientAmmo(int client, int iSlot0)
+bool GiveClientAmmo(int client, int iSlot0)
 {
-	char slot0ClassName[40];
-	GetEdictClassname(iSlot0, slot0ClassName, sizeof(slot0ClassName));
-	int weaponAmmoOffset, ammoMax;
-	for( int i = 0 ; i < sizeof(weapon_ammo) ; ++i) {
-		if (strcmp(slot0ClassName, weapon_ammo[i][0]) == 0)
+	char slot0ClassName[64];
+	GetEntityClassname(iSlot0, slot0ClassName, sizeof(slot0ClassName));
+
+	CWeaponAmmoData cWeaponAmmoData;
+	if(g_smWeaponAmmoData.GetArray(slot0ClassName, cWeaponAmmoData, sizeof(CWeaponAmmoData)) == false) 
+	{
+		CPrintToChat(client, "%T", "Not Official Weapon", client);
+		return false;
+	}
+
+	int offset = GetEntData(iSlot0, g_iPrimaryAmmoType) * 4; // Thanks to "Root" or whoever for this method of not hard-coding offsets: https://github.com/zadroot/AmmoManager/blob/master/scripting/ammo_manager.sp
+	
+	if( offset )
+	{
+		int official_ammo_limit;
+		g_smWeaponAmmoCvar.GetValue(slot0ClassName, official_ammo_limit);
+		if(official_ammo_limit == -2)
 		{
-			weaponAmmoOffset = StringToInt(weapon_ammo[i][1]);
-			ammoMax = GetEntData(client, ammoOffset+(weaponAmmoOffset*4)) + StringToInt(weapon_ammo[i][2]);
-			if(ammoMax > 999) ammoMax = 999;
-			SetEntData(client, ammoOffset+(weaponAmmoOffset*4), ammoMax);
-		}	
-	}			
+			CPrintToChat(client, "%T", "Ammo is infinite", client);
+			return false;
+		}
+
+		int ammo = GetEntData(client, g_iOffsetAmmo + offset);
+		int max_ammo_limit;
+
+		if(cWeaponAmmoData.m_iMaxLimit == -1) max_ammo_limit = official_ammo_limit;
+		else max_ammo_limit = cWeaponAmmoData.m_iMaxLimit;
+
+		if(max_ammo_limit < 0) max_ammo_limit = 999;
+
+		if(ammo >= max_ammo_limit)
+		{
+			CPrintToChat(client, "%T", "Ammo Reach Limit", client);
+			return false;
+		}
+
+		ammo += cWeaponAmmoData.m_iGive;
+		if(ammo >= max_ammo_limit) ammo = max_ammo_limit;
+
+		SetEntData(client, g_iOffsetAmmo + offset, ammo);
+	}
+
+	return true;
 }
 
 void GiveClientHealth(int client, int iHealthAdd)
@@ -1152,7 +1265,7 @@ void GiveClientHealth(int client, int iHealthAdd)
 	int iHealth = GetClientHealth( client );
 	float fHealth = L4D_GetTempHealth( client );
 
-	if(iHealthAdd>=99) 
+	if(iHealthAdd>=100) 
 	{
 		int flagsgive = GetCommandFlags("give");
 		SetCommandFlags("give", flagsgive & ~FCVAR_CHEAT);

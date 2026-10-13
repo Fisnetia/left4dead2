@@ -1,10 +1,6 @@
 *
 !.gitignore
 
-!host.txt
-!motd.txt
-!index.html
-
 !/ems/
 !/ems/**
 

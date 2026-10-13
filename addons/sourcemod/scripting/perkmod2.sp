@@ -300,6 +300,16 @@ public Plugin:myinfo=
 #include <dhooks>
 #include <left4dhooks>
 
+#undef REQUIRE_PLUGIN
+#tryinclude <l4d2_gifts>
+#define REQUIRE_PLUGIN
+
+#if !defined _l4d2_gifts_included_
+	#define L4D2_GIFT_STANDARD	1
+	#define L4D2_GIFT_SPECIAL	2
+	native bool L4D2_Gifts_DropGift(int entity, int type = L4D2_GIFT_STANDARD);
+#endif
+
 // #endregion
 // =======================================================================
 
@@ -390,7 +400,10 @@ new g_iMyDisabler[MAXPLAYERS+1];
 
 //VARS TO STORE CONVAR VALUES
 //declare revive time var
-new Float:g_flReviveTime= -1.0;
+float g_flReviveTime = -1.0;
+//survivor_revive_duration, looked up once instead of going
+//through FindConVar on every revive
+ConVar g_hReviveDuration;
 //OFFSETS
 new g_iHPBuffO			= -1;
 new g_iHPBuffTimeO		= -1;
@@ -443,114 +456,116 @@ new bool:g_bIsLoading		 = false;
 //SUR1 PERKS
 //stopping power, damage multiplier
 //one-size-fits-all
-new Handle:g_hStopping_enable;
-new Handle:g_hStopping_dmgmult;
+ConVar g_hStopping_enable;
+ConVar g_hStopping_dmgmult;
 //associated var
-new g_iStopping_enable;
-new Float:g_flStopping_dmgmult;
+int g_iStopping_enable;
+float g_flStopping_dmgmult;
 
 //sleight of hand, reload rate
 //one-size-fits-all
-new Handle:g_hSoH_enable;
-new Handle:g_hSoH_rate;
+ConVar g_hSoH_enable;
+ConVar g_hSoH_rate;
 //associated var
-new g_iSoH_enable;
-new Float:g_flSoH_rate;
+int g_iSoH_enable;
+float g_flSoH_rate;
 
 //pyrotechnician
-new Handle:g_hPyro_enable;
-new Handle:g_hPyro_maxticks;
+ConVar g_hPyro_enable;
+ConVar g_hPyro_maxticks;
 //associated vars
-new g_iPyro_enable;
-new g_iPyro_maxticks;
+int g_iPyro_enable;
+int g_iPyro_maxticks;
 
 //martial artist, movement rate
 //campaign, non-campaign
-new Handle:g_hMA_enable;
-new Handle:g_hMA_maxpenalty;
+ConVar g_hMA_enable;
+ConVar g_hMA_maxpenalty;
 //associated var
-new g_iMA_enable;
-new g_iMA_maxpenalty;
+int g_iMA_enable;
+int g_iMA_maxpenalty;
 
 //christmas gift
-new Handle:g_hChristmas_enable;
+ConVar g_hChristmas_enable;
 //associated var
-new g_iChristmas_enable;
+int g_iChristmas_enable;
+//is the l4d2_gifts plugin loaded (it provides L4D2_Gifts_DropGift)
+bool g_bAvailable_l4d2_gifts;
 
 //SUR2 PERKS
 //unbreakable, bonus hp
 //one-size-fits-all
-new Handle:g_hUnbreak_enable;
-new Handle:g_hUnbreak_hp;
-new Handle:g_hUnbreak_hr;
+ConVar g_hUnbreak_enable;
+ConVar g_hUnbreak_hp;
+ConVar g_hUnbreak_hr;
 //associated var
-new g_iUnbreak_enable;
-new g_iUnbreak_hp;
-new Float:g_fUnbreak_hr;
+int g_iUnbreak_enable;
+int g_iUnbreak_hp;
+float g_fUnbreak_hr;
 
 //spirit, bonus buffer and cooldown
 //campaign, survival, versus
-new Handle:g_hSpirit_enable;
-new Handle:g_hSpirit_buff;
-new Handle:g_hSpirit_cd;
+ConVar g_hSpirit_enable;
+ConVar g_hSpirit_buff;
+ConVar g_hSpirit_cd;
 //associated vars
-new g_iSpirit_enable;
-new g_iSpirit_buff;
-new g_iSpirit_cd;
+int g_iSpirit_enable;
+int g_iSpirit_buff;
+int g_iSpirit_cd;
 
 //helping hand, bonus buffer and time multiplier
 //versus, non-versus
-new Handle:g_hHelpHand_enable;
-new Handle:g_hHelpHand_convar;
-new Handle:g_hHelpHand_timemult;
-new Handle:g_hHelpHand_buff;
+ConVar g_hHelpHand_enable;
+ConVar g_hHelpHand_convar;
+ConVar g_hHelpHand_timemult;
+ConVar g_hHelpHand_buff;
 //associated vars
-new g_iHelpHand_enable;
-new g_iHelpHand_convar;
-new Float:g_flHelpHand_timemult;
-new g_iHelpHand_buff;
+int g_iHelpHand_enable;
+int g_iHelpHand_convar;
+float g_flHelpHand_timemult;
+int g_iHelpHand_buff;
 
 //pack cat, ammo refill
-new Handle:g_hPackCat_enable;
-new Handle:g_hPackCat_ammorefill;
+ConVar g_hPackCat_enable;
+ConVar g_hPackCat_ammorefill;
 //associated vars
-new g_iPackCat_enable;
-new Float:g_flPackCat_ammorefill;
+int g_iPackCat_enable;
+float g_flPackCat_ammorefill;
 
 //SUR3 PERKS
 //pack rat, bonus ammo multiplier
 //one-size-fits-all
-new Handle:g_hPack_enable;
-new Handle:g_hPack_ammomult;
-new Handle:g_hPack_extraclip;
+ConVar g_hPack_enable;
+ConVar g_hPack_ammomult;
+ConVar g_hPack_extraclip;
 //associated var
-new g_iPack_enable;
-new Float:g_flPack_ammomult;
-new g_iPack_extraclip;
+int g_iPack_enable;
+float g_flPack_ammomult;
+int g_iPack_extraclip;
 
 //chem reliant, bonus buffer
 //one-size-fits-all
-new Handle:g_hChem_enable;
-new Handle:g_hChem_buff;
+ConVar g_hChem_enable;
+ConVar g_hChem_buff;
 //associated var
-new g_iChem_enable;
-new g_iChem_buff;
+int g_iChem_enable;
+int g_iChem_buff;
 
 //hard to kill, hp multiplier
 //one-size-fits-all
-new Handle:g_hHard_enable;
-new Handle:g_hHard_hpmult;
+ConVar g_hHard_enable;
+ConVar g_hHard_hpmult;
 //associated var
-new g_iHard_enable;
-new Float:g_flHard_hpmult;
+int g_iHard_enable;
+float g_flHard_hpmult;
 
 //extreme conditioning, movement rate
 //campaign, non-campaign
-new Handle:g_hExtreme_enable;
-new Handle:g_hExtreme_rate;
+ConVar g_hExtreme_enable;
+ConVar g_hExtreme_rate;
 //associated var
-new g_iExtreme_enable;
-new Float:g_flExtreme_rate;
+int g_iExtreme_enable;
+float g_flExtreme_rate;
 
 
 //BOT CONTROLLER VARS
@@ -558,64 +573,33 @@ new Float:g_flExtreme_rate;
 //for what perks bots should use
 
 //survivor
-new Handle:g_hBot_Sur1;
-new Handle:g_hBot_Sur2;
-new Handle:g_hBot_Sur3;
+ConVar g_hBot_Sur1;
+ConVar g_hBot_Sur2;
+ConVar g_hBot_Sur3;
 //DEFAULT PERKS
 //These vars track the server's
 //given default perks, to account
 //for disabling perks
 
 //sur1
-new Handle:g_hSur1_default;
-new g_iSur1_default;
+ConVar g_hSur1_default;
+int g_iSur1_default;
 //sur2
-new Handle:g_hSur2_default;
-new g_iSur2_default;
+ConVar g_hSur2_default;
+int g_iSur2_default;
 //sur3
-new Handle:g_hSur3_default;
-new g_iSur3_default;
-
-//FORCE RANDOM PERKS
-//tracks server setting for
-//whether to force random perks
-
-new Handle:g_hForceRandom;
-new g_iForceRandom;
-
-//ENABLE RANDOM PERKS BY PLAYER CHOICE
-//tracks whether player can
-//randomize their perks
-
-new Handle:g_hRandomEnable;
-new g_iRandomEnable;
-
-//PERK TREES AVAILABILITY
-//option for servers to completely
-//disable entire perk trees
-
-new Handle:g_hSur1_enable;
-new Handle:g_hSur2_enable;
-new Handle:g_hSur3_enable;
-new g_iSur1_enable;
-new g_iSur2_enable;
-new g_iSur3_enable;
-
-//PERK HIERARCHY AVAILABILITY
-//option for servers to completely
-//disable perks for infected or survivors
-new Handle:g_hSurAll_enable;
-new g_iSurAll_enable;
+ConVar g_hSur3_default;
+int g_iSur3_default;
 
 //this var keeps track of whether
 //to enable Stopping or not, so we don't
 //have to do the checks every game frame, or
 //every time someone gets hurt
 
-new g_iMA_meta_enable = 1;
+int g_iMA_meta_enable = 1;
 
 //controls whether menu automatically shows
-new Handle:g_hMenuAutoShow_enable;
+ConVar g_hMenuAutoShow_enable;
 
 // #endregion
 // =======================================================================
@@ -637,58 +621,32 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	}
 
 	RegPluginLibrary("perkmod2");
-	CreateNative("perkmod2_IsEnable_SurvivorPrimary", Native_IsEnable_SurvivorPrimary);
-	CreateNative("perkmod2_IsEnable_SurvivorPrimary_StoppingPower", Native_IsEnable_SurvivorPrimary_StoppingPower);
-	CreateNative("perkmod2_IsEnable_SurvivorPrimary_SleightOfHand", Native_IsEnable_SurvivorPrimary_SleightOfHand);
-	CreateNative("perkmod2_IsEnable_SurvivorPrimary_Pyrotechnician", Native_IsEnable_SurvivorPrimary_Pyrotechnician);
-	CreateNative("perkmod2_IsEnable_SurvivorPrimary_MartialArtist", Native_IsEnable_SurvivorPrimary_MartialArtist);
-	CreateNative("perkmod2_IsEnable_SurvivorPrimary_ChristmasGift", Native_IsEnable_SurvivorPrimary_ChristmasGift);
-	CreateNative("perkmod2_IsEnable_SurvivorSecondary", Native_IsEnable_SurvivorSecondary);
-	CreateNative("perkmod2_IsEnable_SurvivorSecondary_Unbreakable", Native_IsEnable_SurvivorSecondary_Unbreakable);
-	CreateNative("perkmod2_IsEnable_SurvivorSecondary_Spirit", Native_IsEnable_SurvivorSecondary_Spirit);
-	CreateNative("perkmod2_IsEnable_SurvivorSecondary_HelpingHand", Native_IsEnable_SurvivorSecondary_HelpingHand);
-	CreateNative("perkmod2_IsEnable_SurvivorSecondary_PackCat", Native_IsEnable_SurvivorSecondary_PackCat);
-	CreateNative("perkmod2_IsEnable_SurvivorTertiary", Native_IsEnable_SurvivorTertiary);
-	CreateNative("perkmod2_IsEnable_SurvivorTertiary_PackRat", Native_IsEnable_SurvivorTertiary_PackRat);
-	CreateNative("perkmod2_IsEnable_SurvivorTertiary_ChemReliant", Native_IsEnable_SurvivorTertiary_ChemReliant);
-	CreateNative("perkmod2_IsEnable_SurvivorTertiary_HardToKill", Native_IsEnable_SurvivorTertiary_HardToKill);
-	CreateNative("perkmod2_IsEnable_SurvivorTertiary_ExtremeConditioning", Native_IsEnable_SurvivorTertiary_ExtremeConditioning);
-	CreateNative("perkmod2_IsClientConfirm", Native_IsClientConfirm);
-	CreateNative("perkmod2_IsClientSelect_SurvivorPrimary_StoppingPower", Native_IsClientSelect_SurvivorPrimary_StoppingPower);
-	CreateNative("perkmod2_IsClientSelect_SurvivorPrimary_SleightOfHand", Native_IsClientSelect_SurvivorPrimary_SleightOfHand);
-	CreateNative("perkmod2_IsClientSelect_SurvivorPrimary_Pyrotechnician", Native_IsClientSelect_SurvivorPrimary_Pyrotechnician);
-	CreateNative("perkmod2_IsClientSelect_SurvivorPrimary_MartialArtist", Native_IsClientSelect_SurvivorPrimary_MartialArtist);
-	CreateNative("perkmod2_IsClientSelect_SurvivorPrimary_ChristmasGift", Native_IsClientSelect_SurvivorPrimary_ChristmasGift);
-	CreateNative("perkmod2_IsClientSelect_SurvivorSecondary_Unbreakable", Native_IsClientSelect_SurvivorSecondary_Unbreakable);
-	CreateNative("perkmod2_IsClientSelect_SurvivorSecondary_Spirit", Native_IsClientSelect_SurvivorSecondary_Spirit);
-	CreateNative("perkmod2_IsClientSelect_SurvivorSecondary_HelpingHand", Native_IsClientSelect_SurvivorSecondary_HelpingHand);
-	CreateNative("perkmod2_IsClientSelect_SurvivorSecondary_PackCat", Native_IsClientSelect_SurvivorSecondary_PackCat);
-	CreateNative("perkmod2_IsClientSelect_SurvivorTertiary_PackRat", Native_IsClientSelect_SurvivorTertiary_PackRat);
-	CreateNative("perkmod2_IsClientSelect_SurvivorTertiary_ChemReliant", Native_IsClientSelect_SurvivorTertiary_ChemReliant);
-	CreateNative("perkmod2_IsClientSelect_SurvivorTertiary_HardToKill", Native_IsClientSelect_SurvivorTertiary_HardToKill);
-	CreateNative("perkmod2_IsClientSelect_SurvivorTertiary_ExtremeConditioning", Native_IsClientSelect_SurvivorTertiary_ExtremeConditioning);
-	CreateNative("perkmod2_IsExist_SurvivorPrimary_StoppingPower", Native_IsExist_SurvivorPrimary_StoppingPower);
-	CreateNative("perkmod2_IsExist_SurvivorPrimary_SleightOfHand", Native_IsExist_SurvivorPrimary_SleightOfHand);
-	CreateNative("perkmod2_IsExist_SurvivorPrimary_Pyrotechnician", Native_IsExist_SurvivorPrimary_Pyrotechnician);
-	CreateNative("perkmod2_IsExist_SurvivorPrimary_MartialArtist", Native_IsExist_SurvivorPrimary_MartialArtist);
-	CreateNative("perkmod2_IsExist_SurvivorPrimary_ChristmasGift", Native_IsExist_SurvivorPrimary_ChristmasGift);
-	CreateNative("perkmod2_IsExist_SurvivorSecondary_Unbreakable", Native_IsExist_SurvivorSecondary_Unbreakable);
-	CreateNative("perkmod2_IsExist_SurvivorSecondary_Spirit", Native_IsExist_SurvivorSecondary_Spirit);
-	CreateNative("perkmod2_IsExist_SurvivorSecondary_HelpingHand", Native_IsExist_SurvivorSecondary_HelpingHand);
-	CreateNative("perkmod2_IsExist_SurvivorSecondary_PackCat", Native_IsExist_SurvivorSecondary_PackCat);
-	CreateNative("perkmod2_IsExist_SurvivorTertiary_PackRat", Native_IsExist_SurvivorTertiary_PackRat);
-	CreateNative("perkmod2_IsExist_SurvivorTertiary_ChemReliant", Native_IsExist_SurvivorTertiary_ChemReliant);
-	CreateNative("perkmod2_IsExist_SurvivorTertiary_HardToKill", Native_IsExist_SurvivorTertiary_HardToKill);
-	CreateNative("perkmod2_IsExist_SurvivorTertiary_ExtremeConditioning", Native_IsExist_SurvivorTertiary_ExtremeConditioning);
 	CreateNative("perkmod2_Pyro_OnWeaponFire", Native_Pyro_OnWeaponFire);
 
+	MarkNativeAsOptional("L4D2_Gifts_DropGift");
+
 	return APLRes_Success;
+}
+
+public void OnAllPluginsLoaded()
+{
+	g_bAvailable_l4d2_gifts = LibraryExists("l4d2_gifts");
+}
+
+public void OnLibraryAdded(const char[] name)
+{
+	g_bAvailable_l4d2_gifts = LibraryExists("l4d2_gifts");
+}
+
+public void OnLibraryRemoved(const char[] name)
+{
+	g_bAvailable_l4d2_gifts = LibraryExists("l4d2_gifts");
 }
 
 public OnPluginStart()
 {
 	//Plugin version for online tracking
-	CreateConVar("l4d_perkmod_version", PLUGIN_VERSION, "Version of Perkmod2 for L4D2", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
+	CreateConVar("l4d_perkmod_version", PLUGIN_VERSION, "Version of Perkmod2 for L4D2", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	
 	//PERK FUNCTIONS
 	//anything here that pertains to the actual
@@ -762,7 +720,8 @@ public OnPluginStart()
 	//RegConsoleCmd("say_team", Debug_OnSay);
 
 	//init vars
-	g_flReviveTime		=	GetConVarFloat(FindConVar("survivor_revive_duration"));
+	g_hReviveDuration	=	FindConVar("survivor_revive_duration");
+	g_flReviveTime		=	g_hReviveDuration.FloatValue;
 
 	//get offsets
 	g_iHPBuffO			=	FindSendPropInfo("CTerrorPlayer","m_healthBuffer");
@@ -805,261 +764,201 @@ public OnPluginStart()
 
 //just to give me a bit less of a headache,
 //all convar creation is called here
-CreateConvars()
+void CreateConvars()
 {
 	//SURVIVOR
 	//stopping power
 	g_hStopping_dmgmult = CreateConVar(
 		"l4d_perkmod_stoppingpower_damagemultiplier" ,
 		"0.25" ,
-		"Stopping Power perk: Bonus damage multiplier, ADDED to base damage (clamped between 0.05 < 1.0)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hStopping_dmgmult, Convar_Stopping);
-	g_flStopping_dmgmult = 0.25;
+		"Stopping Power perk: Bonus damage multiplier, ADDED to base damage" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.05, true, 1.0 );
 
 	g_hStopping_enable = CreateConVar(
 		"l4d_perkmod_stoppingpower_enable" ,
 		"1" ,
 		"Stopping Power perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hStopping_enable, Convar_Stopping_en);
-	g_iStopping_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//sleight of hand
 	g_hSoH_rate = CreateConVar(
 		"l4d_perkmod_sleightofhand_rate" ,
 		"0.5714" ,
-		"Sleight of Hand perk: The interval incurred by reloading is multiplied by this value (clamped between 0.2 < 0.9)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSoH_rate, Convar_SoH);
-	g_flSoH_rate=			0.5714;
+		"Sleight of Hand perk: The interval incurred by reloading is multiplied by this value" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.02, true, 0.9 );
 
 	g_hSoH_enable = CreateConVar(
 		"l4d_perkmod_sleightofhand_enable" ,
 		"1" ,
 		"Sleight of Hand perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSoH_enable, Convar_SoH_en);
-	g_iSoH_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//pyrotechnician
 	g_hPyro_maxticks = CreateConVar(
 		"l4d_perkmod_pyrotechnician_maxticks" ,
 		"60" ,
-		"Pyrotechnician perk: The number of ticks (a tick is 2s) before giving a survivor a pipe bomb, ie. 60 ticks = 120 seconds. Clamped between 0 < 300, where 0 disables this feature." ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hPyro_maxticks, Convar_Pyro);
-	g_iPyro_maxticks = 60;
+		"Pyrotechnician perk: The number of ticks (a tick is 2s) before giving a survivor a pipe bomb, ie. 60 ticks = 120 seconds. 0 disables this feature." ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 300.0 );
 
 	g_hPyro_enable = CreateConVar(
 		"l4d_perkmod_pyrotechnician_enable" ,
 		"1" ,
 		"Pyrotechnician perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hPyro_enable, Convar_Pyro_en);
-	g_iPyro_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//martial artist
 	g_hMA_maxpenalty = CreateConVar(
 		"l4d_perkmod_martialartist_maximumpenalty" ,
 		"4" ,
-		"Martial Artist perk: The maximum shove penalty applied to survivors. It's Valve's coding, so I don't know what each value exactly translates to, but 6 is the maximum shove penalty (~1.5s)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hMA_maxpenalty, Convar_MA_maxpenalty);
-	g_iMA_maxpenalty = 6;
+		"Martial Artist perk: The maximum shove penalty applied to survivors, where 6 is the maximum shove penalty (~1.5s)" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 6.0 );
 
 	g_hMA_enable = CreateConVar(
 		"l4d_perkmod_martialartist_enable" ,
 		"1" ,
 		"Martial Artist perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hMA_enable, Convar_MA_en);
-	g_iMA_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//christmas gift
 	g_hChristmas_enable = CreateConVar(
 		"l4d_perkmod_christmasgift_enable" ,
 		"1" ,
 		"Christmas Gift perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hChristmas_enable, Convar_Christmas_en);
-	g_iChristmas_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//unbreakable
 	g_hUnbreak_hp = CreateConVar(
 		"l4d_perkmod_unbreakable_bonushealth" ,
 		"20" ,
-		"Unbreakable perk: Bonus health given for Unbreakable; this value is also given as bonus health buffer on being revived (clamped between 1 < 100)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hUnbreak_hp, Convar_Unbreak);
-	g_iUnbreak_hp = 20;
+		"Unbreakable perk: Bonus health given for Unbreakable; this value is also given as bonus health buffer on being revived" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 1.0, true, 100.0 );
 
 	g_hUnbreak_hr = CreateConVar(
 		"l4d_perkmod_unbreakable_healrate" ,
 		"0.8" ,
-		"Unbreakable perk: The rate at which health is restored (clamped between 0.8 < 1.0)",
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hUnbreak_hr, Convar_Unbreak_hr);
-	g_fUnbreak_hr = 0.8;
+		"Unbreakable perk: The rate at which health is restored" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.8, true, 1.0 );
 
 	g_hUnbreak_enable = CreateConVar(
 		"l4d_perkmod_unbreakable_enable" ,
 		"1" ,
 		"Unbreakable perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hUnbreak_enable, Convar_Unbreak_en);
-	g_iUnbreak_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//spirit
 	g_hSpirit_buff = CreateConVar(
 		"l4d_perkmod_spirit_bonusbuffer" ,
 		"10" ,
-		"Spirit perk: Bonus health buffer on self-revive (clamped between 0 < 170)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSpirit_buff, Convar_SpiritBuff);
-	g_iSpirit_buff=				30;
+		"Spirit perk: Bonus health buffer on self-revive" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 170.0 );
 
 	g_hSpirit_cd = CreateConVar(
 		"l4d_perkmod_spirit_cooldown" ,
 		"60" ,
-		"Spirit perk: Cooldown for self-reviving in seconds, campaign (clamped between 1 < 1800)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSpirit_cd, Convar_SpiritCD);
-	g_iSpirit_cd=				60;
+		"Spirit perk: Cooldown for self-reviving in seconds, campaign" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 1.0, true, 1800.0 );
 
 	g_hSpirit_enable = CreateConVar(
 		"l4d_perkmod_spirit_enable" ,
 		"1" ,
 		"Spirit perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSpirit_enable, Convar_Spirit_en);
-	g_iSpirit_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//helping hand
 	g_hHelpHand_timemult = CreateConVar(
 		"l4d_perkmod_helpinghand_timemultiplier" ,
 		"0.6" ,
-		"Helping Hand perk: Time multiplier to revive others with Helping Hand (clamped between 0.01 < 1.0)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hHelpHand_timemult, Convar_HelpTime);
-	g_flHelpHand_timemult = 0.6;
+		"Helping Hand perk: Time multiplier to revive others with Helping Hand" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.01, true, 1.0 );
 
 	g_hHelpHand_buff = CreateConVar(
 		"l4d_perkmod_helpinghand_bonusbuffer" ,
 		"15" ,
-		"Helping Hand perk: Bonus health buffer given to allies after reviving them, campaign/survival (clamped between 0 < 170)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hHelpHand_buff, Convar_HelpBuff);
-	g_iHelpHand_buff = 15;
+		"Helping Hand perk: Bonus health buffer given to allies after reviving them, campaign/survival" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 1.0, true, 170.0 );
 
 	g_hHelpHand_enable = CreateConVar(
 		"l4d_perkmod_helpinghand_enable" ,
 		"1" ,
 		"Helping Hand perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled (NOTE: This perk normally adjusts the survivor_revive_duration ConVar; disabling this perk will stop the plugin from adjusting this ConVar)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hHelpHand_enable, Convar_Help_en);
-	g_iHelpHand_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	g_hHelpHand_convar = CreateConVar(
 		"l4d_perkmod_helpinghand_enable_convarchanges" ,
 		"1" ,
 		"Helping Hand perk: This perk normally adjusts the survivor_revive_duration ConVar; setting this to 0 will stop the plugin from adjusting this ConVar" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hHelpHand_convar, Convar_Help_convar);
-	g_iHelpHand_convar = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//pack cat
 	g_hPackCat_ammorefill = CreateConVar(
 		"l4d_perkmod_packcat_ammorefill" ,
 		"0.04" ,
-		"Pack Cat perk: Special Infected refill this amount of ammo (clamped between 0.01 < 0.25)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hPackCat_ammorefill, Convar_PackCat_ammorefill);
-	g_flPackCat_ammorefill = 0.04;
+		"Pack Cat perk: Special Infected refill this amount of ammo" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.01, true, 0.25 );
 
 	g_hPackCat_enable = CreateConVar(
 		"l4d_perkmod_packcat_enable" ,
 		"1" ,
 		"Pack Cat perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hPackCat_enable, Convar_PackCat_en);
-	g_iPackCat_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//pack rat
 	g_hPack_ammomult = CreateConVar(
 		"l4d_perkmod_packrat_ammomultiplier" ,
 		"0.25" ,
-		"Pack Rat perk: Bonus ammo capacity, ADDED to base capacity (clamped between 0.01 < 1.0)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hPack_ammomult, Convar_Pack);
-	g_flPack_ammomult = 0.25;
+		"Pack Rat perk: Bonus ammo capacity, ADDED to base capacity" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.01, true, 1.0 );
 
 	g_hPack_extraclip = CreateConVar(
 		"l4d_perkmod_packrat_extraclip" ,
 		"1" ,
-		"Pack Rat perk: Bonus extra clips (clamped between 1 < 5)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hPack_extraclip, Convar_Pack_extraclip);
-	g_iPack_extraclip = 1;
+		"Pack Rat perk: Bonus extra clips" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 1.0, true, 5.0 );
 
 	g_hPack_enable = CreateConVar(
 		"l4d_perkmod_packrat_enable" ,
 		"1" ,
 		"Pack Rat perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hPack_enable, Convar_Pack_en);
-	g_iPack_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//chem reliant
 	g_hChem_buff = CreateConVar(
 		"l4d_perkmod_chemreliant_bonusbuffer" ,
 		"0" ,
-		"Chem Reliant perk: Bonus health buffer given when taking pills (clamped between 0 < 150)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hChem_buff, Convar_Chem);
-	g_iChem_buff = 0;
+		"Chem Reliant perk: Bonus health buffer given when taking pills" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 150.0 );
 
 	g_hChem_enable = CreateConVar(
 		"l4d_perkmod_chemreliant_enable" ,
 		"1" ,
 		"Chem Reliant perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hChem_enable, Convar_Chem_en);
-	g_iChem_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//hard to kill
 	g_hHard_hpmult = CreateConVar(
 		"l4d_perkmod_hardtokill_healthmultiplier" ,
 		"0.5" ,
-		"Hard to Kill perk: Bonus incap health multiplier, product is ADDED to base incap health (clamped between 0.01 < 3.0)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hHard_hpmult, Convar_Hard);
-	g_flHard_hpmult = 0.5;
+		"Hard to Kill perk: Bonus incap health multiplier, product is ADDED to base incap health" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.01, true, 3.0 );
 
 	g_hHard_enable = CreateConVar(
 		"l4d_perkmod_hardtokill_enable" ,
 		"1" ,
 		"Hard to Kill perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hHard_enable, Convar_Hard_en);
-	g_iHard_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//extreme conditioning
 	g_hExtreme_rate = CreateConVar(
 		"l4d_perkmod_extremeconditioning_rate" ,
 		"1.1" ,
-		"Extreme Conditioning perk: Survivor movement is multiplied by this value (clamped between 1.0 < 1.5)" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hExtreme_rate, Convar_Extreme);
-	g_flExtreme_rate = 1.1;
+		"Extreme Conditioning perk: Survivor movement is multiplied by this value" ,
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 1.0, true, 1.5 );
 
 	g_hExtreme_enable = CreateConVar(
 		"l4d_perkmod_extremeconditioning_enable" ,
 		"1" ,
 		"Extreme Conditioning perk: Allows the perk to be chosen by players in campaign, 0=disabled, 1=enabled" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hExtreme_enable, Convar_Extreme_en);
-	g_iExtreme_enable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
 
 	//MISC
 	//bot preferences for perks
@@ -1067,538 +966,158 @@ CreateConvars()
 		"l4d_perkmod_bot_survivor1" ,
 		"1,2" ,
 		"Bot preferences for Survivor 1 perks: 1 = stopping power, 2 = sleight of hand" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
+		FCVAR_SPONLY|FCVAR_NOTIFY );
 
 	g_hBot_Sur2 = CreateConVar(
 		"l4d_perkmod_bot_survivor2" ,
 		"1,2,3" ,
 		"Bot preferences for Survivor 2 perks: 1 = unbreakable, 2 = spirit, 3 = helping hand" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
+		FCVAR_SPONLY|FCVAR_NOTIFY );
 
 	g_hBot_Sur3 = CreateConVar(
 		"l4d_perkmod_bot_survivor3" ,
 		"1,3" ,
 		"Bot preferences for Survivor 3 perks: 1 = pack rat, 3 = hard to kill" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
+		FCVAR_SPONLY|FCVAR_NOTIFY );
 
 	//default perks
 	g_hSur1_default = CreateConVar(
 		"l4d_perkmod_default_survivor1" ,
 		"1" ,
 		"Default selected perk for Survivor, Primary: 1 = stopping power, 2 = sleight of hand, 3 = pyrotechnician, 4 = martial artist, 5 = christmas gift" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSur1_default, Convar_Def_Sur1);
-	g_iSur1_default = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 1.0, true, 5.0 );
 
 	g_hSur2_default = CreateConVar(
 		"l4d_perkmod_default_survivor2" ,
 		"1" ,
 		"Default selected perk for Survivor, Secondary: 1 = unbreakable, 2 = spirit, 3 = helping hand, 4 = pack cat" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSur2_default, Convar_Def_Sur2);
-	g_iSur2_default = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 1.0, true, 4.0 );
 
 	g_hSur3_default = CreateConVar(
 		"l4d_perkmod_default_survivor3" ,
 		"1" ,
 		"Default selected perk for Survivor, Tertiary: 1 = pack rat, 2 = chem reliant, 3 = hard to kill" ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSur3_default, Convar_Def_Sur3);
-	g_iSur3_default = 1;
-
-	//enable perk trees
-	//-----------------
-	g_hSur1_enable = CreateConVar(
-		"l4d_perkmod_perktree_survivor1_enable" ,
-		"1" ,
-		"If set to 1, players will be allowed to select perks from the primary Survivor tree." ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSur1_enable, Convar_Sur1_en);
-	g_iSur1_enable = 1;
-
-	g_hSur2_enable = CreateConVar(
-		"l4d_perkmod_perktree_survivor2_enable" ,
-		"1" ,
-		"If set to 1, players will be allowed to select perks from the secondary Survivor tree." ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSur2_enable, Convar_Sur2_en);
-	g_iSur2_enable = 1;
-
-	g_hSur3_enable = CreateConVar(
-		"l4d_perkmod_perktree_survivor3_enable" ,
-		"1" ,
-		"If set to 1, players will be allowed to select perks from the tertiary Survivor tree." ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSur3_enable, Convar_Sur3_en);
-	g_iSur3_enable = 1;
-
-	//perk hierarchy
-	//--------------
-	g_hSurAll_enable = CreateConVar(
-		"l4d_perkmod_perktree_survivor_enable" ,
-		"1" ,
-		"If set to 1, players will be allowed to select perks as Survivors (affects ALL perks for Survivors)." ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hSurAll_enable, Convar_SurAll);
-	g_iSurAll_enable = 1;
-
-
-
-	//force random perks
-	g_hForceRandom = CreateConVar(
-		"l4d_perkmod_forcerandomperks" ,
-		"0" ,
-		"If set to 1, players will be assigned random perks at roundstart, and they cannot edit their perks." ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hForceRandom, Convar_ForceRandom);
-	g_iForceRandom = 0;
-
-	//enable random perk choice
-	g_hRandomEnable = CreateConVar(
-		"l4d_perkmod_randomperks_enable" ,
-		"1" ,
-		"If set to 1, players will be allowed to randomize their perks at roundstart. Otherwise, they can only customize their perks or use default perks." ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
-	HookConVarChange(g_hRandomEnable, Convar_Random_en);
-	g_iRandomEnable = 1;
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 1.0, true, 3.0 );
 
 	//misc game convars
 	g_hMenuAutoShow_enable = CreateConVar(
 		"l4d_perkmod_autoshowmenu" ,
 		"1" ,
 		"If set to 1, the perks menu will automatically be shown at the start of every round." ,
-		FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_NOTIFY );
+		FCVAR_SPONLY|FCVAR_NOTIFY , true, 0.0, true, 1.0 );
+
+	//every convar whose value is cached in a global refreshes
+	//that global through one and the same callback
+	g_hStopping_dmgmult.AddChangeHook(ConVarChanged);
+	g_hStopping_enable.AddChangeHook(ConVarChanged);
+	g_hSoH_rate.AddChangeHook(ConVarChanged);
+	g_hSoH_enable.AddChangeHook(ConVarChanged);
+	g_hPyro_maxticks.AddChangeHook(ConVarChanged);
+	g_hPyro_enable.AddChangeHook(ConVarChanged);
+	g_hMA_maxpenalty.AddChangeHook(ConVarChanged);
+	g_hMA_enable.AddChangeHook(ConVarChanged);
+	g_hChristmas_enable.AddChangeHook(ConVarChanged);
+	g_hUnbreak_hp.AddChangeHook(ConVarChanged);
+	g_hUnbreak_hr.AddChangeHook(ConVarChanged);
+	g_hUnbreak_enable.AddChangeHook(ConVarChanged);
+	g_hSpirit_buff.AddChangeHook(ConVarChanged);
+	g_hSpirit_cd.AddChangeHook(ConVarChanged);
+	g_hSpirit_enable.AddChangeHook(ConVarChanged);
+	g_hHelpHand_timemult.AddChangeHook(ConVarChanged);
+	g_hHelpHand_buff.AddChangeHook(ConVarChanged);
+	g_hHelpHand_enable.AddChangeHook(ConVarChanged);
+	g_hHelpHand_convar.AddChangeHook(ConVarChanged);
+	g_hPackCat_ammorefill.AddChangeHook(ConVarChanged);
+	g_hPackCat_enable.AddChangeHook(ConVarChanged);
+	g_hPack_ammomult.AddChangeHook(ConVarChanged);
+	g_hPack_extraclip.AddChangeHook(ConVarChanged);
+	g_hPack_enable.AddChangeHook(ConVarChanged);
+	g_hChem_buff.AddChangeHook(ConVarChanged);
+	g_hChem_enable.AddChangeHook(ConVarChanged);
+	g_hHard_hpmult.AddChangeHook(ConVarChanged);
+	g_hHard_enable.AddChangeHook(ConVarChanged);
+	g_hExtreme_rate.AddChangeHook(ConVarChanged);
+	g_hExtreme_enable.AddChangeHook(ConVarChanged);
+	g_hSur1_default.AddChangeHook(ConVarChanged);
+	g_hSur2_default.AddChangeHook(ConVarChanged);
+	g_hSur3_default.AddChangeHook(ConVarChanged);
+
+	//start out in sync with the convar defaults; OnConfigsExecuted
+	//syncs again once perkmod2.cfg and the server's cfgs have run
+	GetCvars();
 }
+
 //=============================
 // ConVar Changes
 //=============================
 
-//changes in perkmod convars
-//---------------------------
-
-//stopping power
-//the enable/disable functions also call
-//the checks-pre-calculate function
-public Convar_Stopping (Handle:convar, const String:oldValue[], const String:newValue[])
+//the convars are read constantly (some of them on every game frame),
+//so their values are cached in globals instead of being fetched each time
+void GetCvars()
 {
-	new Float:flF=StringToFloat(newValue);
-	if (flF<0.05)
-		flF=0.05;
-	else if (flF>1.0)
-		flF=1.0;
-	g_flStopping_dmgmult = flF;
+	//sur1
+	g_flStopping_dmgmult	=	g_hStopping_dmgmult.FloatValue;
+	g_iStopping_enable		=	g_hStopping_enable.IntValue;
+	g_flSoH_rate			=	g_hSoH_rate.FloatValue;
+	g_iSoH_enable			=	g_hSoH_enable.IntValue;
+	g_iPyro_maxticks		=	g_hPyro_maxticks.IntValue;
+	g_iPyro_enable			=	g_hPyro_enable.IntValue;
+	g_iMA_maxpenalty		=	g_hMA_maxpenalty.IntValue;
+	g_iMA_enable			=	g_hMA_enable.IntValue;
+	g_iChristmas_enable		=	g_hChristmas_enable.IntValue;
+
+	//sur2
+	g_iUnbreak_hp			=	g_hUnbreak_hp.IntValue;
+	g_fUnbreak_hr			=	g_hUnbreak_hr.FloatValue;
+	g_iUnbreak_enable		=	g_hUnbreak_enable.IntValue;
+	g_iSpirit_buff			=	g_hSpirit_buff.IntValue;
+	g_iSpirit_cd			=	g_hSpirit_cd.IntValue;
+	g_iSpirit_enable		=	g_hSpirit_enable.IntValue;
+	g_flHelpHand_timemult	=	g_hHelpHand_timemult.FloatValue;
+	g_iHelpHand_buff		=	g_hHelpHand_buff.IntValue;
+	g_iHelpHand_enable		=	g_hHelpHand_enable.IntValue;
+	g_iHelpHand_convar		=	g_hHelpHand_convar.IntValue;
+	g_flPackCat_ammorefill	=	g_hPackCat_ammorefill.FloatValue;
+	g_iPackCat_enable		=	g_hPackCat_enable.IntValue;
+
+	//sur3
+	g_flPack_ammomult		=	g_hPack_ammomult.FloatValue;
+	g_iPack_extraclip		=	g_hPack_extraclip.IntValue;
+	g_iPack_enable			=	g_hPack_enable.IntValue;
+	g_iChem_buff			=	g_hChem_buff.IntValue;
+	g_iChem_enable			=	g_hChem_enable.IntValue;
+	g_flHard_hpmult			=	g_hHard_hpmult.FloatValue;
+	g_iHard_enable			=	g_hHard_enable.IntValue;
+	g_flExtreme_rate		=	g_hExtreme_rate.FloatValue;
+	g_iExtreme_enable		=	g_hExtreme_enable.IntValue;
+
+	//default perks
+	g_iSur1_default			=	g_hSur1_default.IntValue;
+	g_iSur2_default			=	g_hSur2_default.IntValue;
+	g_iSur3_default			=	g_hSur3_default.IntValue;
 }
 
-public Convar_Stopping_en (Handle:convar, const String:oldValue[], const String:newValue[])
+public void OnConfigsExecuted()
 {
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iStopping_enable = iI;
+	GetCvars();
 }
 
-//sleight of hand
-public Convar_SoH (Handle:convar, const String:oldValue[], const String:newValue[])
+//the values are clamped by the convar bounds themselves, so all that's
+//left to do here is to refresh the cache and to re-apply the perks that
+//hand values out to players (movement speed and shove penalty)
+public void ConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	new Float:flF=StringToFloat(newValue);
-	if (flF<0.02)
-		flF=0.02;
-	else if (flF>0.9)
-		flF=0.9;
-	g_flSoH_rate = flF;
-}
+	GetCvars();
 
-public Convar_SoH_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iSoH_enable = iI;
-}
-
-//pyrotechnician
-public Convar_Pyro (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI<0)
-		iI=0;
-	else if (iI>300)
-		iI=300;
-	g_iPyro_maxticks = iI;
-}
-
-public Convar_Pyro_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iPyro_enable = iI;
-}
-
-//martial artist
-//also rebuilds MA registry in order to
-//reassign new speed values
-public Convar_MA_maxpenalty (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI<0)
-		iI=0;
-	else if (iI>6)
-		iI=6;
-	g_iMA_maxpenalty = iI;
-	MA_Rebuild();
-}
-
-public Convar_MA_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iMA_enable = iI;
-}
-
-public Convar_Christmas_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iChristmas_enable = iI;
-}
-
-//unbreakable
-public Convar_Unbreak (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI<1)
-		iI=1;
-	else if (iI>100)
-		iI=100;
-	g_iUnbreak_hp = iI;
-}
-
-public Convar_Unbreak_hr (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new Float:flF=StringToFloat(newValue);
-	if (flF<0.8)
-		flF=0.8;
-	else if (flF>1.0)
-		flF=1.0;
-	g_fUnbreak_hr = flF;
-}
-
-public Convar_Unbreak_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iUnbreak_enable = iI;
-}
-
-//spirit
-public Convar_SpiritBuff (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI<0)
-		iI=0;
-	else if (iI>170)
-		iI=170;
-	g_iSpirit_buff = iI;
-}
-
-public Convar_SpiritCD (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI<1)
-		iI=1;
-	else if (iI>1800)
-		iI=1800;
-	g_iSpirit_cd = iI;
-}
-
-public Convar_Spirit_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iSpirit_enable = iI;
-}
-
-//helping hand
-public Convar_HelpTime (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new Float:flF=StringToFloat(newValue);
-	if (flF<0.01)
-		flF=0.01;
-	else if (flF>1.0)
-		flF=1.0;
-	g_flHelpHand_timemult = flF;
-}
-
-public Convar_HelpBuff (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI<1)
-		iI=1;
-	else if (iI>170)
-		iI=170;
-	g_iHelpHand_buff = iI;
-}
-
-public Convar_Help_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iHelpHand_enable = iI;
-}
-
-public Convar_Help_convar (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iHelpHand_convar = iI;
-}
-
-public Convar_PackCat_ammorefill (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new Float:flF=StringToFloat(newValue);
-	if (flF<0.01)
-		flF=0.01;
-	else if (flF>0.25)
-		flF=0.25;
-	g_flPackCat_ammorefill = flF;
-}
-
-public Convar_PackCat_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iPackCat_enable = iI;
-}
-
-//pack rat
-public Convar_Pack (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new Float:flF=StringToFloat(newValue);
-	if (flF<0.01)
-		flF=0.01;
-	else if (flF>1.0)
-		flF=1.0;
-	g_flPack_ammomult = flF;
-}
-
-public Convar_Pack_extraclip (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI<1)
-		iI=1;
-	else if (iI>5)
-		iI=5;
-	g_iPack_extraclip = iI;
-}
-
-public Convar_Pack_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iPack_enable = iI;
-}
-
-//chem reliant
-public Convar_Chem (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI<0)
-		iI=0;
-	else if (iI>150)
-		iI=150;
-	g_iChem_buff = iI;
-}
-
-public Convar_Chem_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iChem_enable = iI;
-}
-
-//hard to kill
-public Convar_Hard (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new Float:flF=StringToFloat(newValue);
-	if (flF<0.01)
-		flF=0.01;
-	else if (flF>3.0)
-		flF=3.0;
-	g_flHard_hpmult = flF;
-}
-
-public Convar_Hard_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iHard_enable = iI;
-}
-
-//extreme conditioning
-public Convar_Extreme (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new Float:flF=StringToFloat(newValue);
-	if (flF<1.0)
-		flF=1.0;
-	else if (flF>1.5)
-		flF=1.5;
-	g_flExtreme_rate = flF;
-	Extreme_Rebuild();
-}
-
-public Convar_Extreme_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-	g_iExtreme_enable = iI;
-}
-
-//default perks
-public Convar_Def_Sur1 (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI<=0)
-		iI=1;
-	else if (iI>5)
-		iI=5;
-
-	g_iSur1_default=iI;
-}
-
-public Convar_Def_Sur2 (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI<=0)
-		iI=1;
-	else if (iI>4)
-		iI=4;
-
-	g_iSur2_default=iI;
-}
-
-public Convar_Def_Sur3 (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI<=0)
-		iI=1;
-	else if (iI>3)
-		iI=3;
-
-	g_iSur3_default=iI;
-}
-
-//force random perks
-public Convar_ForceRandom (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-
-	g_iForceRandom=iI;
-}
-
-//enable random perk choice
-public Convar_Random_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-
-	g_iRandomEnable=iI;
-}
-
-//perk trees
-public Convar_Sur1_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-
-	g_iSur1_enable=iI;
-
-	RunChecksAll();
-}
-
-public Convar_Sur2_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-
-	g_iSur2_enable=iI;
-	RunChecksAll();
-}
-
-public Convar_Sur3_en (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-
-	g_iSur3_enable=iI;
-	RunChecksAll();
-}
-
-public Convar_SurAll (Handle:convar, const String:oldValue[], const String:newValue[])
-{
-	new iI=StringToInt(newValue);
-	if (iI==0)
-		iI=0;
-	else
-		iI=1;
-
-	g_iSurAll_enable=iI;
-	RunChecksAll();
+	if (convar == g_hMA_maxpenalty
+		|| convar == g_hMA_enable)
+	{
+		MA_RunChecks();
+		MA_Rebuild();
+	}
+	else if (convar == g_hExtreme_rate
+		|| convar == g_hExtreme_enable)
+		Extreme_Rebuild();
 }
 
 // #endregion
@@ -1646,12 +1165,6 @@ public Event_PlayerSpawn (Handle:event, const String:name[], bool:dontBroadcast)
 	//since they just spawned, so set max to 100
 	if (iTeam == 2)
 	{
-		if (g_iSurAll_enable == 0)
-		{
-			g_iConfirm[iCid] = 0;
-			return;
-		}
-
 		if ( GetEntProp(iCid,Prop_Data,"m_iHealth") > 100 )
 			SetEntProp(iCid,Prop_Data,"m_iHealth", 100 );
 
@@ -1819,6 +1332,7 @@ public Event_PlayerDeath (Handle:event, const String:name[], bool:dontBroadcast)
 	if (attacker == 0) return;
 	if (attacker != iCid && GetClientTeam(iCid) == 3)
 	{
+		ChristmasGift_OnInfectedKilled(iCid, attacker);
 		PC_GiveFullAmmo(attacker);
 	}
 }
@@ -1940,16 +1454,30 @@ public Action:Event_PlayerHurtPre (Handle:event, const String:name[], bool:dontB
 	if (IsInvalidClient(iAttacker)) return Plugin_Continue;
 	if (IsInvalidClient(iVictim)) return Plugin_Continue;
 
-	if (IsEnable_SurvivorPrimary()
-		&& IsEnable_SurvivorPrimary_StoppingPower()
+	if (IsEnable_SurvivorPrimary_StoppingPower()
 		&& IsClientConfirm(iAttacker)
 		&& IsClientSelect_SurvivorPrimary_StoppingPower(iAttacker))
 	{
-		if (GetClientTeam(iAttacker)==2)
+		//the bonus damage is written straight into m_iHealth, which bypasses
+		//the game's own damage handling - so it must only ever hit non-survivors.
+		//with friendly fire on, applying it to a teammate can drop their health
+		//to 0 or below, and the game then kills them outright instead of
+		//putting them into the incapacitated state
+		if (GetClientTeam(iAttacker)==2
+			&& GetClientTeam(iVictim)!=2)
 		{
+			int hp = GetEntProp(iVictim,Prop_Data,"m_iHealth");
+			if (hp<=1)
+				return Plugin_Continue;
+
 			int dmg_health=GetEventInt(event,"dmg_health");
 			int damage_add = RoundToNearest(dmg_health * g_flStopping_dmgmult);
-			int hp = GetEntProp(iVictim,Prop_Data,"m_iHealth");
+
+			//and for the same reason the victim is never taken below 1hp:
+			//the kill has to come from the game, not from this write
+			if (damage_add >= hp)
+				damage_add = hp-1;
+
 			SetEntProp(iVictim,Prop_Data,"m_iHealth", hp - damage_add);
 		}
 	}
@@ -1963,8 +1491,7 @@ public Event_InfectedHurtPre (Handle:event, const String:name[], bool:dontBroadc
 	int iAttacker=GetClientOfUserId(GetEventInt(event,"attacker"));
 	if (IsInvalidClient(iAttacker)) return;
 
-	if (IsEnable_SurvivorPrimary()
-		&& IsEnable_SurvivorPrimary_StoppingPower()
+	if (IsEnable_SurvivorPrimary_StoppingPower()
 		&& IsClientConfirm(iAttacker)
 		&& IsClientSelect_SurvivorPrimary_StoppingPower(iAttacker))
 	{
@@ -2280,6 +1807,7 @@ public Event_WitchKilled (Handle:event, const String:name[], bool:dontBroadcast)
 	new iCid=GetClientOfUserId(GetEventInt(event,"userid"));
 	if (iCid==0) return;
 
+	ChristmasGift_OnWitchKilled(GetEventInt(event,"witchid"));
 	PC_GiveFullAmmo(iCid);
 }
 
@@ -2473,8 +2001,7 @@ ShowPerkCooldownHint()
 		new iPyroRemain=0;
 		new iSpiritRemain=0;
 
-		if (g_iSur1_enable==1
-			&& g_iPyro_enable==1
+		if (g_iPyro_enable==1
 			&& g_iPyro_maxticks > 0
 			&& g_iSur1[iCid]==3)
 		{
@@ -2496,8 +2023,7 @@ ShowPerkCooldownHint()
 			}
 		}
 
-		if (g_iSur2_enable==1
-			&& g_iSpirit_enable==1
+		if (g_iSpirit_enable==1
 			&& g_iSur2[iCid]==2
 			&& g_iSpiritCooldown[iCid]==1)
 		{
@@ -2584,7 +2110,7 @@ public Action:Timer_ShowTopMenu (Handle:timer, any:iCid)
 		|| g_bIsLoading == true)
 		return Plugin_Stop;
 
-	if (GetConVarInt(g_hMenuAutoShow_enable)==0)
+	if (!g_hMenuAutoShow_enable.BoolValue)
 		return Plugin_Stop;
 
 	//----DEBUG----
@@ -2592,23 +2118,15 @@ public Action:Timer_ShowTopMenu (Handle:timer, any:iCid)
 
 	new iT = GetClientTeam(iCid);
 
-	//don't show menu if perks are disabled
-	if ((g_iSurAll_enable == 0 && iT == 2) || (iT == 3))
+	//don't show the menu to infected
+	if (iT == 3)
 	{
 		g_iConfirm[iCid] = 0;
 		return Plugin_Stop;
 	}
 
-	if (g_iForceRandom==0)
-	{
-		//default case
-		if (iT==2)
-			SendPanelToClient(Menu_Initial(iCid),iCid,Menu_ChooseInit,MENU_TIME_FOREVER);
-		else if (iT==3)
-			g_iConfirm[iCid] = 1;
-	}
-	else
-		AssignRandomPerks(iCid);
+	if (iT==2)
+		SendPanelToClient(Menu_Initial(iCid),iCid,Menu_ChooseInit,MENU_TIME_FOREVER);
 
 	return Plugin_Stop;
 }
@@ -2770,16 +2288,12 @@ AssignRandomPerks (iCid)
 //picks a random perk for bots
 Bot_Sur1_PickRandom ()
 {
-	//stop if sur1 perks are disabled
-	if (g_iSur1_enable==0)
-		return 0;
-
 	new iPerkType[12];
 	new iPerkCount=0;
 
 	decl String:stPerk[24];
 	if (g_hBot_Sur1 != INVALID_HANDLE)
-		GetConVarString(g_hBot_Sur1,stPerk,24);
+		g_hBot_Sur1.GetString(stPerk, sizeof(stPerk));
 	else
 		stPerk = "1,2";
 
@@ -2808,16 +2322,12 @@ Bot_Sur1_PickRandom ()
 
 Bot_Sur2_PickRandom ()
 {
-	//stop if sur2 perks are disabled
-	if (g_iSur2_enable==0)
-		return 0;
-
 	new iPerkType[12];
 	new iPerkCount=0;
 
 	decl String:stPerk[24];
 	if (g_hBot_Sur2 != INVALID_HANDLE)
-		GetConVarString(g_hBot_Sur2,stPerk,24);
+		g_hBot_Sur2.GetString(stPerk, sizeof(stPerk));
 	else
 		stPerk = "1,2,3";
 
@@ -2854,16 +2364,12 @@ Bot_Sur2_PickRandom ()
 
 Bot_Sur3_PickRandom ()
 {
-	//stop if sur3 perks are disabled
-	if (g_iSur3_enable==0)
-		return 0;
-
 	new iPerkType[12];
 	new iPerkCount=0;
 
 	decl String:stPerk[24];
 	if (g_hBot_Sur3 != INVALID_HANDLE)
-		GetConVarString(g_hBot_Sur3,stPerk,24);
+		g_hBot_Sur3.GetString(stPerk, sizeof(stPerk));
 	else
 		stPerk = "1,3";
 
@@ -2908,7 +2414,7 @@ Bot_Sur3_PickRandom ()
 SoH_OnReload (iCid)
 {
 	//check if perk is disabled
-	if (g_iSur1_enable==0 || g_iSoH_enable==0)
+	if (g_iSoH_enable==0)
 		return;
 
 	new iSur1 = g_iSur1[iCid];
@@ -3366,8 +2872,7 @@ public Action:SoH_ShotgunEndCock (Handle:timer, any:hPack)
 //on pickup
 Pyro_Pickup(iCid, String:stWpn[])
 {
-	if (IsEnable_SurvivorPrimary()
-		&& IsEnable_SurvivorPrimary_Pyrotechnician()
+	if (IsEnable_SurvivorPrimary_Pyrotechnician()
 		&& IsClientConfirm(iCid)
 		&& IsClientSelect_SurvivorPrimary_Pyrotechnician(iCid))
 	{
@@ -3414,7 +2919,7 @@ Pyro_Pickup(iCid, String:stWpn[])
 Pyro_OnWeaponFire(iCid, String:stWpn[])
 {
 	//check if perk is enabled
-	if (g_iSur1_enable==0 || g_iPyro_enable==0)
+	if (g_iPyro_enable==0)
 		return;
 
 	if (g_iConfirm[iCid]==0
@@ -3500,7 +3005,7 @@ Event_Confirm_Grenadier (iCid)
 		return;
 
 	//check if perk is enabled
-	if (g_iSur1_enable==0 || g_iPyro_enable==0)
+	if (g_iPyro_enable==0)
 		return;
 
 	//reset grenade count on player
@@ -3538,7 +3043,7 @@ Pyro_Timer()
 	decl iTicks;
 
 	//check if perk is enabled
-	if (g_iSur1_enable==0 || g_iPyro_maxticks == 0 || g_iPyro_enable==0)
+	if (g_iPyro_maxticks == 0 || g_iPyro_enable==0)
 		return;
 
 	//or if no one has DT, don't bother either
@@ -3664,7 +3169,7 @@ Pyro_Clear (bool:bRoundStart)
 
 MA_RunChecks ()
 {
-	if (g_iSur1_enable==1 || g_iMA_enable==1)
+	if (g_iMA_enable==1)
 		g_iMA_meta_enable=1;
 	else
 		g_iMA_meta_enable=0;
@@ -3679,7 +3184,7 @@ Event_Confirm_MA (iCid)
 		g_iMARegisterCount=0;
 
 	//check if perk is enabled
-	if (g_iSur1_enable==0 || g_iMA_enable==0)
+	if (g_iMA_enable==0)
 		return;
 
 	if (IsClientInGame(iCid)==true
@@ -3712,7 +3217,7 @@ MA_Rebuild ()
 		return;
 
 	//check if perk is enabled
-	if (g_iSur1_enable==0 || g_iMA_enable==0)
+	if (g_iMA_enable==0)
 		return;
 
 	//----DEBUG----
@@ -3983,7 +3488,7 @@ MA_OnGameFrame()
 Unbreakable_OnHeal (iCid)
 {
 	//check if perk is enabled
-	if (g_iSur2_enable==0 || g_iUnbreak_enable==0)
+	if (g_iUnbreak_enable==0)
 		return;
 
 	if (g_iSur2[iCid]==1)
@@ -4009,7 +3514,7 @@ Event_Confirm_Unbreakable (iCid)
 	new TC=GetClientTeam(iCid);
 
 	//check if perk is enabled
-	if (g_iSur2_enable==0 || g_iUnbreak_enable==0)
+	if (g_iUnbreak_enable==0)
 	{
 		//if not, check if hp is higher than it should be
 		if (iHP>100
@@ -4060,7 +3565,7 @@ Unbreakable_OnRescue (iCid)
 	if (g_iSur2[iCid]==1)
 	{
 		//check if perk is enabled
-		if (g_iSur2_enable==0 || g_iUnbreak_enable==0)
+		if (g_iUnbreak_enable==0)
 			return;
 
 		CreateTimer(0.5,Unbreakable_Delayed_Rescue,iCid);
@@ -4084,7 +3589,7 @@ Unbreakable_OnRevive (iSub, iLedge)
 		&& iLedge == 0)
 	{
 		//check if perk is enabled
-		if (g_iSur1_enable==1 && g_iUnbreak_enable==1)
+		if (g_iUnbreak_enable==1)
 		{
 			SetEntDataFloat(iSub,g_iHPBuffO, GetEntDataFloat(iSub,g_iHPBuffO)+(g_iUnbreak_hp/2) ,true);
 		}
@@ -4187,7 +3692,7 @@ public Action:Unbreakable_Delayed_SetLow (Handle:timer, any:iCid)
 Spirit_Timer ()
 {
 	//check if perk is enabled
-	if (g_iSur2_enable==0 || g_iSpirit_enable==0)
+	if (g_iSpirit_enable==0)
 		return;
 
 	//this var counts how many people are incapped
@@ -4434,7 +3939,7 @@ HelpHand_OnReviveBegin (iCid)
 		return 0;
 
 	//check if perk is enabled
-	if (g_iSur2_enable==0 || g_iHelpHand_enable==0)
+	if (g_iHelpHand_enable==0)
 		return 0;
 
 	//----DEBUG----
@@ -4447,7 +3952,7 @@ HelpHand_OnReviveBegin (iCid)
 		//----DEBUG----
 		//PrintToChatAll("\x03-perk present, setting revive time to \x01%f",g_flReviveTime/2);
 
-		SetConVarFloat(FindConVar("survivor_revive_duration"), g_flReviveTime * g_flHelpHand_timemult ,false,false);
+		g_hReviveDuration.FloatValue = g_flReviveTime * g_flHelpHand_timemult;
 		return 0;
 	}
 
@@ -4457,7 +3962,7 @@ HelpHand_OnReviveBegin (iCid)
 		//----DEBUG----
 		//PrintToChatAll("\x03-no perk, attempting to reset revive time to \x01%f",g_flReviveTime);
 
-		SetConVarFloat(FindConVar("survivor_revive_duration"),g_flReviveTime,false,false);
+		g_hReviveDuration.FloatValue = g_flReviveTime;
 		return 0;
 	}
 }
@@ -4468,7 +3973,7 @@ HelpHand_OnReviveSuccess (iCid, iSub, iLedge)
 	//PrintToChatAll("\x05helphand\x03 reviver: \x01%i\x03, subject: \x01%i",iCid,iSub);
 
 	//then check for helping hand
-	if (g_iSur2[iCid]==3 && g_iConfirm[iCid]==1 && g_iSur2_enable==1 && g_iHelpHand_enable==1)
+	if (g_iSur2[iCid]==3 && g_iConfirm[iCid]==1 && g_iHelpHand_enable==1)
 	{
 		switch (iLedge)
 		{
@@ -4510,13 +4015,13 @@ HelpHand_OnReviveSuccess (iCid, iSub, iLedge)
 	//only adjust the convar if
 	//convar changes are allowed
 	//for this perk
-	if (g_iHelpHand_convar==1 && g_iSur2_enable==1 && g_iHelpHand_enable==1)
-		SetConVarFloat(FindConVar("survivor_revive_duration"),g_flReviveTime,false,false);
+	if (g_iHelpHand_convar==1 && g_iHelpHand_enable==1)
+		g_hReviveDuration.FloatValue = g_flReviveTime;
 
 	//and then check if we need to continue allowing crawling
 	//by running checks through everyone...
 	//...but first, check if spirit convar changes are allowed
-	/*if (g_iSur1_enable==1 && g_iSpirit_crawling==1 && g_iSpirit_enable==1)
+	/*if (g_iSpirit_crawling==1 && g_iSpirit_enable==1)
 	{
 		new iCrawlClient=-1;
 		for (new iI2=1 ; iI2<=MaxClients ; iI2++)
@@ -4574,8 +4079,7 @@ public Action:HelpHand_Delayed (Handle:timer, any:iCid)
 //gives full ammo
 PC_GiveFullAmmo(int client)
 {
-	if (IsEnable_SurvivorSecondary()
-		&& IsEnable_SurvivorSecondary_PackCat()
+	if (IsEnable_SurvivorSecondary_PackCat()
 		&& IsClientConfirm(client)
 		&& IsClientSelect_SurvivorSecondary_PackCat(client))
 	{
@@ -4587,8 +4091,7 @@ PC_GiveFullAmmo(int client)
 			if (maxAmmoCarry <= 0) return;
 
 			int refill = RoundToNearest(maxAmmoCarry * g_flPackCat_ammorefill);
-			if (IsEnable_SurvivorTertiary()
-				&& IsEnable_SurvivorTertiary_PackRat()
+			if (IsEnable_SurvivorTertiary_PackRat()
 				&& IsClientConfirm(client)
 				&& IsClientSelect_SurvivorTertiary_PackRat(client))
 				refill = RoundToNearest(refill * (1 + g_flPack_ammomult));
@@ -4605,8 +4108,7 @@ PC_GiveFullAmmo(int client)
 //gives full ammo
 PR_GiveFullAmmo(int client, int extraClip = 0)
 {
-	if (IsEnable_SurvivorTertiary()
-		&& IsEnable_SurvivorTertiary_PackRat()
+	if (IsEnable_SurvivorTertiary_PackRat()
 		&& IsClientConfirm(client)
 		&& IsClientSelect_SurvivorTertiary_PackRat(client))
 	{
@@ -4637,7 +4139,7 @@ PR_GiveFullAmmo(int client, int extraClip = 0)
 Chem_OnDrugUsed (iCid)
 {
 	//check if perk is enabled
-	if (g_iSur3_enable==0 || g_iChem_enable==0)
+	if (g_iChem_enable==0)
 		return 0;
 
 	//----DEBUG----
@@ -4655,7 +4157,7 @@ Chem_OnDrugUsed (iCid)
 		//they have unbreakable or not
 
 		//CASE 1: HAS UNBREAKABLE
-		if (g_iSur2[iCid]==1 && g_iSur3_enable==1 && g_iUnbreak_enable==1)
+		if (g_iSur2[iCid]==1 && g_iUnbreak_enable==1)
 		{
 			//CASE 1A:
 			//combined health + chem reliant < max health possible
@@ -4702,7 +4204,7 @@ Event_Confirm_ChemReliant (iCid)
 		return;
 
 	//check if perk is enabled
-	if (g_iSur3_enable==0 || g_iChem_enable==0)
+	if (g_iChem_enable==0)
 		return;
 
 	new iflags=GetCommandFlags("give");
@@ -4729,7 +4231,7 @@ HardToKill_OnIncap (iCid)
 		|| GetClientTeam(iCid)!=2)
 		return;
 
-	if (g_iSur3_enable==0 || g_iHard_enable==0)
+	if (g_iHard_enable==0)
 		return;
 
 	if (g_iSur3[iCid]==3)
@@ -4780,7 +4282,7 @@ Extreme_Rebuild ()
 		return;
 
 	//check if perk is enabled
-	if (g_iSur3_enable==0 || g_iExtreme_enable==0)
+	if (g_iExtreme_enable==0)
 		return;
 
 	//----DEBUG----
@@ -4806,6 +4308,45 @@ Extreme_Rebuild ()
 	}
 }
 
+//===========================
+// CHRISTMAS GIFT
+//===========================
+
+void ChristmasGift_OnInfectedKilled(int victim, int attacker)
+{
+	if (!g_bAvailable_l4d2_gifts) return;
+
+	if (victim == attacker) return;
+	if (!IsClientInGame(victim) || GetClientTeam(victim) != 3) return;
+
+	if (GetEntProp(victim, Prop_Send, "m_zombieClass") == 8)
+	{
+		if (!IsExist_SurvivorPrimary_ChristmasGift()) return;
+
+		L4D2_Gifts_DropGift(victim, L4D2_GIFT_SPECIAL);
+	}
+	else
+	{
+		if (IsInvalidClient(attacker)) return;
+		if (GetClientTeam(attacker) != 2) return;
+		if (!IsEnable_SurvivorPrimary_ChristmasGift()) return;
+		if (!IsClientConfirm(attacker)) return;
+		if (!IsClientSelect_SurvivorPrimary_ChristmasGift(attacker)) return;
+
+		L4D2_Gifts_DropGift(victim, L4D2_GIFT_STANDARD);
+	}
+}
+
+void ChristmasGift_OnWitchKilled(int witch)
+{
+	if (!g_bAvailable_l4d2_gifts) return;
+
+	if (witch <= 0 || !IsValidEntity(witch)) return;
+	if (!IsExist_SurvivorPrimary_ChristmasGift()) return;
+
+	L4D2_Gifts_DropGift(witch, L4D2_GIFT_SPECIAL);
+}
+
 // #endregion
 // =======================================================================
 
@@ -4827,8 +4368,8 @@ public Action:MenuOpen_OnSay(iCid, args)
 {
 	new iT = GetClientTeam(iCid);
 
-	//don't show the menu if all perks are disabled
-	if ((g_iSurAll_enable == 0 && iT == 2) || (iT == 3))
+	//don't show the menu to infected
+	if (iT == 3)
 	{
 		g_iConfirm[iCid] = 0;
 		return Plugin_Handled;
@@ -4867,18 +4408,11 @@ public Handle:Menu_Initial (iCid)
 	Format(stPanel, 128, "%t", "MenuInitialPanelCustom");
 	DrawPanelItem(menu, stPanel);
 
-	//random perks, enable only if cvar is set
-	if (g_iRandomEnable==0)
-	{
-		DrawPanelItem(menu,"disabled", ITEMDRAW_NOTEXT);
-	}
-	else
-	{
-		Format(stPanel, 128, "%t", "MenuInitialDescriptionRandom");
-		DrawPanelText(menu, stPanel);
-		Format(stPanel, 128, "%t", "MenuInitialPanelRandom");
-		DrawPanelItem(menu, stPanel);
-	}
+	//random perks
+	Format(stPanel, 128, "%t", "MenuInitialDescriptionRandom");
+	DrawPanelText(menu, stPanel);
+	Format(stPanel, 128, "%t", "MenuInitialPanelRandom");
+	DrawPanelItem(menu, stPanel);
 
 	Format(stPanel, 128, "%t", "MenuInitialDescriptionAuto");
 	DrawPanelText(menu, stPanel);
@@ -4951,10 +4485,7 @@ public Handle:Menu_Top (iCid)
 		st_perk="Not set";
 
 	Format(st_display,64,"Survivor - Primary (%s)",st_perk);
-	if (g_iSur1_enable==1)
-		DrawPanelItem(menu,st_display);
-	else
-		DrawPanelItem(menu,"disabled", ITEMDRAW_NOTEXT);
+	DrawPanelItem(menu,st_display);
 
 
 	//set name for sur2 perk
@@ -4970,10 +4501,7 @@ public Handle:Menu_Top (iCid)
 		st_perk="Not set";
 
 	Format(st_display,64,"Survivor - Secondary (%s)", st_perk);
-	if (g_iSur2_enable==1)
-		DrawPanelItem(menu,st_display);
-	else
-		DrawPanelItem(menu,"disabled", ITEMDRAW_NOTEXT);
+	DrawPanelItem(menu,st_display);
 
 	//set name for sur3 perk
 	if (g_iSur3[iCid]==1 && g_iPack_enable==1)
@@ -4988,10 +4516,7 @@ public Handle:Menu_Top (iCid)
 		st_perk="Not set";
 
 	Format(st_display,64,"Survivor - Tertiary (%s)", st_perk);
-	if (g_iSur3_enable==1)
-		DrawPanelItem(menu,st_display);
-	else
-		DrawPanelItem(menu,"disabled", ITEMDRAW_NOTEXT);
+	DrawPanelItem(menu,st_display);
 
 	DrawPanelItem(menu,st_display, ITEMDRAW_NOTEXT);
 	DrawPanelItem(menu,st_display, ITEMDRAW_NOTEXT);
@@ -5208,11 +4733,8 @@ public Handle:Menu_ShowChoices (iCid)
 	else
 		Format(st_perk,128,"%t", "NotSet");
 
-	if (g_iSur1_enable==1)
-	{
-		DrawPanelItem(menu,"Survivor, primary:");
-		DrawPanelText(menu,st_perk);
-	}
+	DrawPanelItem(menu,"Survivor, primary:");
+	DrawPanelText(menu,st_perk);
 
 	//show sur2 perk
 	iPerk = g_iSur2[iCid];
@@ -5238,11 +4760,8 @@ public Handle:Menu_ShowChoices (iCid)
 	else
 		Format(st_perk,128,"%t", "NotSet");
 
-	if (g_iSur2_enable==1)
-	{
-		DrawPanelItem(menu,"Survivor, secondary:");
-		DrawPanelText(menu,st_perk);
-	}
+	DrawPanelItem(menu,"Survivor, secondary:");
+	DrawPanelText(menu,st_perk);
 
 	//show sur3 perk
 	iPerk = g_iSur3[iCid];
@@ -5257,11 +4776,8 @@ public Handle:Menu_ShowChoices (iCid)
 	else
 		Format(st_perk,128,"%t", "NotSet");
 
-	if (g_iSur3_enable==1)
-	{
-		DrawPanelItem(menu,"Survivor, tertiary:");
-		DrawPanelText(menu,st_perk);
-	}
+	DrawPanelItem(menu,"Survivor, tertiary:");
+	DrawPanelText(menu,st_perk);
 
 	return menu;
 }
@@ -5819,19 +5335,9 @@ public Action:Debug_StaminaTimer (Handle:timer, any:iCid)
 // =======================================================================
 // #region Helpers
 
-bool IsEnable_SurvivorPrimary()
-{
-	return g_iSur1_enable==1;
-}
-
 bool IsEnable_SurvivorPrimary_StoppingPower()
 {
 	return g_iStopping_enable==1;
-}
-
-bool IsEnable_SurvivorPrimary_SleightOfHand()
-{
-	return g_iSoH_enable==1;
 }
 
 bool IsEnable_SurvivorPrimary_Pyrotechnician()
@@ -5839,34 +5345,9 @@ bool IsEnable_SurvivorPrimary_Pyrotechnician()
 	return g_iPyro_enable==1;
 }
 
-bool IsEnable_SurvivorPrimary_MartialArtist()
-{
-	return g_iMA_enable==1;
-}
-
 bool IsEnable_SurvivorPrimary_ChristmasGift()
 {
 	return g_iChristmas_enable==1;
-}
-
-bool IsEnable_SurvivorSecondary()
-{
-	return g_iSur2_enable==1;
-}
-
-bool IsEnable_SurvivorSecondary_Unbreakable()
-{
-	return g_iUnbreak_enable==1;
-}
-
-bool IsEnable_SurvivorSecondary_Spirit()
-{
-	return g_iSpirit_enable==1;
-}
-
-bool IsEnable_SurvivorSecondary_HelpingHand()
-{
-	return g_iHelpHand_enable==1;
 }
 
 bool IsEnable_SurvivorSecondary_PackCat()
@@ -5874,29 +5355,9 @@ bool IsEnable_SurvivorSecondary_PackCat()
 	return g_iPackCat_enable==1;
 }
 
-bool IsEnable_SurvivorTertiary()
-{
-	return g_iSur3_enable==1;
-}
-
 bool IsEnable_SurvivorTertiary_PackRat()
 {
 	return g_iPack_enable==1;
-}
-
-bool IsEnable_SurvivorTertiary_ChemReliant()
-{
-	return g_iChem_enable==1;
-}
-
-bool IsEnable_SurvivorTertiary_HardToKill()
-{
-	return g_iHard_enable==1;
-}
-
-bool IsEnable_SurvivorTertiary_ExtremeConditioning()
-{
-	return g_iExtreme_enable==1;
 }
 
 bool IsClientConfirm(int client)
@@ -5909,39 +5370,14 @@ bool IsClientSelect_SurvivorPrimary_StoppingPower(int client)
 	return g_iSur1[client]==1;
 }
 
-bool IsClientSelect_SurvivorPrimary_SleightOfHand(int client)
-{
-	return g_iSur1[client]==2;
-}
-
 bool IsClientSelect_SurvivorPrimary_Pyrotechnician(int client)
 {
 	return g_iSur1[client]==3;
 }
 
-bool IsClientSelect_SurvivorPrimary_MartialArtist(int client)
-{
-	return g_iSur1[client]==4;
-}
-
 bool IsClientSelect_SurvivorPrimary_ChristmasGift(int client)
 {
 	return g_iSur1[client]==5;
-}
-
-bool IsClientSelect_SurvivorSecondary_Unbreakable(int client)
-{
-	return g_iSur2[client]==1;
-}
-
-bool IsClientSelect_SurvivorSecondary_Spirit(int client)
-{
-	return g_iSur2[client]==2;
-}
-
-bool IsClientSelect_SurvivorSecondary_HelpingHand(int client)
-{
-	return g_iSur2[client]==3;
 }
 
 bool IsClientSelect_SurvivorSecondary_PackCat(int client)
@@ -5954,89 +5390,9 @@ bool IsClientSelect_SurvivorTertiary_PackRat(int client)
 	return g_iSur3[client]==1;
 }
 
-bool IsClientSelect_SurvivorTertiary_ChemReliant(int client)
-{
-	return g_iSur3[client]==2;
-}
-
-bool IsClientSelect_SurvivorTertiary_HardToKill(int client)
-{
-	return g_iSur3[client]==3;
-}
-
-bool IsClientSelect_SurvivorTertiary_ExtremeConditioning(int client)
-{
-	return g_iSur3[client]==4;
-}
-
-bool IsExist_SurvivorPrimary_StoppingPower()
-{
-	if (!IsEnable_SurvivorPrimary()
-		|| !IsEnable_SurvivorPrimary_StoppingPower()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorPrimary_StoppingPower(i)) return true;
-	}
-
-	return false;
-}
-
-bool IsExist_SurvivorPrimary_SleightOfHand()
-{
-	if (!IsEnable_SurvivorPrimary()
-		|| !IsEnable_SurvivorPrimary_SleightOfHand()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorPrimary_SleightOfHand(i)) return true;
-	}
-
-	return false;
-}
-
-bool IsExist_SurvivorPrimary_Pyrotechnician()
-{
-	if (!IsEnable_SurvivorPrimary()
-		|| !IsEnable_SurvivorPrimary_Pyrotechnician()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorPrimary_Pyrotechnician(i)) return true;
-	}
-
-	return false;
-}
-
-bool IsExist_SurvivorPrimary_MartialArtist()
-{
-	if (!IsEnable_SurvivorPrimary()
-		|| !IsEnable_SurvivorPrimary_MartialArtist()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorPrimary_MartialArtist(i)) return true;
-	}
-
-	return false;
-}
-
 bool IsExist_SurvivorPrimary_ChristmasGift()
 {
-	if (!IsEnable_SurvivorPrimary()
-		|| !IsEnable_SurvivorPrimary_ChristmasGift()) return false;
+	if (!IsEnable_SurvivorPrimary_ChristmasGift()) return false;
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -6044,134 +5400,6 @@ bool IsExist_SurvivorPrimary_ChristmasGift()
 			&& GetClientTeam(i)==2
 			&& IsClientConfirm(i)
 			&& IsClientSelect_SurvivorPrimary_ChristmasGift(i)) return true;
-	}
-
-	return false;
-}
-
-bool IsExist_SurvivorSecondary_Unbreakable()
-{
-	if (!IsEnable_SurvivorSecondary()
-		|| !IsEnable_SurvivorSecondary_Unbreakable()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorSecondary_Unbreakable(i)) return true;
-	}
-
-	return false;
-}
-
-bool IsExist_SurvivorSecondary_Spirit()
-{
-	if (!IsEnable_SurvivorSecondary()
-		|| !IsEnable_SurvivorSecondary_Spirit()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorSecondary_Spirit(i)) return true;
-	}
-
-	return false;
-}
-
-bool IsExist_SurvivorSecondary_HelpingHand()
-{
-	if (!IsEnable_SurvivorSecondary()
-		|| !IsEnable_SurvivorSecondary_HelpingHand()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorSecondary_HelpingHand(i)) return true;
-	}
-
-	return false;
-}
-
-bool IsExist_SurvivorSecondary_PackCat()
-{
-	if (!IsEnable_SurvivorSecondary()
-		|| !IsEnable_SurvivorSecondary_PackCat()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorSecondary_PackCat(i)) return true;
-	}
-
-	return false;
-}
-
-bool IsExist_SurvivorTertiary_PackRat()
-{
-	if (!IsEnable_SurvivorTertiary()
-		|| !IsEnable_SurvivorTertiary_PackRat()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorTertiary_PackRat(i)) return true;
-	}
-
-	return false;
-}
-
-bool IsExist_SurvivorTertiary_ChemReliant()
-{
-	if (!IsEnable_SurvivorTertiary()
-		|| !IsEnable_SurvivorTertiary_ChemReliant()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorTertiary_ChemReliant(i)) return true;
-	}
-
-	return false;
-}
-
-bool IsExist_SurvivorTertiary_HardToKill()
-{
-	if (!IsEnable_SurvivorTertiary()
-		|| !IsEnable_SurvivorTertiary_HardToKill()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorTertiary_HardToKill(i)) return true;
-	}
-
-	return false;
-}
-
-bool IsExist_SurvivorTertiary_ExtremeConditioning()
-{
-	if (!IsEnable_SurvivorTertiary()
-		|| !IsEnable_SurvivorTertiary_ExtremeConditioning()) return false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i)
-			&& GetClientTeam(i)==2
-			&& IsClientConfirm(i)
-			&& IsClientSelect_SurvivorTertiary_ExtremeConditioning(i)) return true;
 	}
 
 	return false;
@@ -6198,235 +5426,6 @@ bool IsInvalidClient (int client)
 
 // =======================================================================
 // #region Native
-
-any Native_IsEnable_SurvivorPrimary(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorPrimary();
-}
-
-any Native_IsEnable_SurvivorPrimary_StoppingPower(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorPrimary_StoppingPower();
-}
-
-any Native_IsEnable_SurvivorPrimary_SleightOfHand(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorPrimary_SleightOfHand();
-}
-
-any Native_IsEnable_SurvivorPrimary_Pyrotechnician(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorPrimary_Pyrotechnician();
-}
-
-any Native_IsEnable_SurvivorPrimary_MartialArtist(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorPrimary_MartialArtist();
-}
-
-any Native_IsEnable_SurvivorPrimary_ChristmasGift(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorPrimary_ChristmasGift();
-}
-
-any Native_IsEnable_SurvivorSecondary(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorSecondary();
-}
-
-any Native_IsEnable_SurvivorSecondary_Unbreakable(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorSecondary_Unbreakable();
-}
-
-any Native_IsEnable_SurvivorSecondary_Spirit(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorSecondary_Spirit();
-}
-
-any Native_IsEnable_SurvivorSecondary_HelpingHand(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorSecondary_HelpingHand();
-}
-
-any Native_IsEnable_SurvivorSecondary_PackCat(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorSecondary_PackCat();
-}
-
-any Native_IsEnable_SurvivorTertiary(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorTertiary();
-}
-
-any Native_IsEnable_SurvivorTertiary_PackRat(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorTertiary_PackRat();
-}
-
-any Native_IsEnable_SurvivorTertiary_ChemReliant(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorTertiary_ChemReliant();
-}
-
-any Native_IsEnable_SurvivorTertiary_HardToKill(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorTertiary_HardToKill();
-}
-
-any Native_IsEnable_SurvivorTertiary_ExtremeConditioning(Handle plugin, int numParams)
-{
-	return IsEnable_SurvivorTertiary_ExtremeConditioning();
-}
-
-any Native_IsClientConfirm(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientConfirm(client);
-}
-
-any Native_IsClientSelect_SurvivorPrimary_StoppingPower(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorPrimary_StoppingPower(client);
-}
-
-any Native_IsClientSelect_SurvivorPrimary_SleightOfHand(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorPrimary_SleightOfHand(client);
-}
-
-any Native_IsClientSelect_SurvivorPrimary_Pyrotechnician(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorPrimary_Pyrotechnician(client);
-}
-
-any Native_IsClientSelect_SurvivorPrimary_MartialArtist(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorPrimary_MartialArtist(client);
-}
-
-any Native_IsClientSelect_SurvivorPrimary_ChristmasGift(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorPrimary_ChristmasGift(client);
-}
-
-any Native_IsClientSelect_SurvivorSecondary_Unbreakable(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorSecondary_Unbreakable(client);
-}
-
-any Native_IsClientSelect_SurvivorSecondary_Spirit(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorSecondary_Spirit(client);
-}
-
-any Native_IsClientSelect_SurvivorSecondary_HelpingHand(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorSecondary_HelpingHand(client);
-}
-
-any Native_IsClientSelect_SurvivorSecondary_PackCat(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorSecondary_PackCat(client);
-}
-
-any Native_IsClientSelect_SurvivorTertiary_PackRat(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorTertiary_PackRat(client);
-}
-
-any Native_IsClientSelect_SurvivorTertiary_ChemReliant(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorTertiary_ChemReliant(client);
-}
-
-any Native_IsClientSelect_SurvivorTertiary_HardToKill(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorTertiary_HardToKill(client);
-}
-
-any Native_IsClientSelect_SurvivorTertiary_ExtremeConditioning(Handle plugin, int numParams)
-{
-	int client = GetNativeCell(1);
-	return IsClientSelect_SurvivorTertiary_ExtremeConditioning(client);
-}
-
-any Native_IsExist_SurvivorPrimary_StoppingPower(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorPrimary_StoppingPower();
-}
-
-any Native_IsExist_SurvivorPrimary_SleightOfHand(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorPrimary_SleightOfHand();
-}
-
-any Native_IsExist_SurvivorPrimary_Pyrotechnician(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorPrimary_Pyrotechnician();
-}
-
-any Native_IsExist_SurvivorPrimary_MartialArtist(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorPrimary_MartialArtist();
-}
-
-any Native_IsExist_SurvivorPrimary_ChristmasGift(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorPrimary_ChristmasGift();
-}
-
-any Native_IsExist_SurvivorSecondary_Unbreakable(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorSecondary_Unbreakable();
-}
-
-any Native_IsExist_SurvivorSecondary_Spirit(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorSecondary_Spirit();
-}
-
-any Native_IsExist_SurvivorSecondary_HelpingHand(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorSecondary_HelpingHand();
-}
-
-any Native_IsExist_SurvivorSecondary_PackCat(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorSecondary_PackCat();
-}
-
-any Native_IsExist_SurvivorTertiary_PackRat(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorTertiary_PackRat();
-}
-
-any Native_IsExist_SurvivorTertiary_ChemReliant(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorTertiary_ChemReliant();
-}
-
-any Native_IsExist_SurvivorTertiary_HardToKill(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorTertiary_HardToKill();
-}
-
-any Native_IsExist_SurvivorTertiary_ExtremeConditioning(Handle plugin, int numParams)
-{
-	return IsExist_SurvivorTertiary_ExtremeConditioning();
-}
 
 any Native_Pyro_OnWeaponFire(Handle plugin, int numParams)
 {

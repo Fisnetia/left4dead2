@@ -72,8 +72,10 @@ enum struct PlayerData
 	bool pendingDisableAdsBySecondary;
 	float primaryattacktime;
 
-	bool isPistol;
 	float cycleTime;
+
+	char weaponClass[48];
+	bool attrValid;
 }
 PlayerData
 	player[MAXPLAYERS + 1];
@@ -82,16 +84,40 @@ ConVar
 	cvar_ads_debug,
 	cvar_ads_key,
 	cvar_ads_cycletime_mul,
-	cvar_ads_cycletime_scar;
+	cvar_ads_cycletime_scar,
+	cvar_ads_attribute_mul;
 enum struct GlobalConVar
 {
 	bool ads_debug;
 	int ads_key;
 	float ads_cycletime_mul;
 	float ads_cycletime_scar;
+	float ads_attribute_mul;
 }
 GlobalConVar
 	cvar;
+
+L4D2FloatWeaponAttributes
+	WP_ATTRS[] =
+{
+	L4D2FWA_MaxSpread
+	//  L4D2FWA_SpreadPerShot
+	// ,L4D2FWA_MaxSpread
+	// ,L4D2FWA_MinDuckingSpread
+	// ,L4D2FWA_MinStandingSpread
+	// ,L4D2FWA_MinInAirSpread
+	// ,L4D2FWA_MaxMovementSpread
+	// ,L4D2FWA_VerticalPunch
+	// ,L4D2FWA_HorizontalPunch
+	// ,L4D2FWA_PelletScatterPitch
+	// ,L4D2FWA_PelletScatterYaw
+};
+
+float
+	g_SavedAttributes[sizeof(WP_ATTRS)];
+
+bool
+	g_bAttributeApplied;
 
 // int currentActivity[MAXPLAYERS + 1];
 
@@ -139,8 +165,10 @@ public void OnClientConnected(int client)
 	player[client].pendingDisableAdsBySecondary = false;
 	player[client].primaryattacktime			= 0.0;
 
-	player[client].isPistol						= false;
 	player[client].cycleTime					= 0.0;
+
+	player[client].weaponClass[0]				= '\0';
+	player[client].attrValid					= false;
 }
 
 public void OnClientPutInServer(int client)
@@ -332,10 +360,12 @@ void LoadConVars()
 	cvar_ads_key = 				CreateConVar("ads_key", "0", "Key to activate ADS. 0 = Zoom key (MOUSE 3), 1 = Walk key (SHIFT), 2 = Duck key (CTRL)");
 	cvar_ads_cycletime_mul = 	CreateConVar("ads_cycletime_mul", "1.1", "ADS cycle-time multiplier. > 1.0 makes ADS slower, 1.0 keeps default.", FCVAR_NONE, true, 1.0);
 	cvar_ads_cycletime_scar = 	CreateConVar("ads_cycletime_scar", "0.12", "Override cycle time for SCAR");
+	cvar_ads_attribute_mul = 		CreateConVar("ads_attribute_mul", "0.5", "Bullet spread multiplier while ADS is active. 1.0 = unchanged, 0.0 = perfect accuracy.", FCVAR_NONE, true, 0.0, true, 1.0);
 	cvar_ads_debug.AddChangeHook(OnConVarChanged);
 	cvar_ads_key.AddChangeHook(OnConVarChanged);
 	cvar_ads_cycletime_mul.AddChangeHook(OnConVarChanged);
 	cvar_ads_cycletime_scar.AddChangeHook(OnConVarChanged);
+	cvar_ads_attribute_mul.AddChangeHook(OnConVarChanged);
 	GetConVars();
 	AutoExecConfig(true, "l4d2_aim_down_sight");
 }
@@ -346,6 +376,7 @@ void GetConVars()
 	cvar.ads_key = cvar_ads_key.IntValue;
 	cvar.ads_cycletime_mul = cvar_ads_cycletime_mul.FloatValue;
 	cvar.ads_cycletime_scar = cvar_ads_cycletime_scar.FloatValue;
+	cvar.ads_attribute_mul = cvar_ads_attribute_mul.FloatValue;
 }
 
 public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -361,8 +392,22 @@ public void OnConfigsExecuted()
 // Events
 void HookEvents()
 {
+	HookEvent("weapon_zoom", Event_WeaponZoom, EventHookMode_Post);
 	HookEvent("weapon_drop", Event_WeaponDrop, EventHookMode_Post);
 	HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
+}
+
+void Event_WeaponZoom(Event event, const char[] name, bool dontBroadcast)
+{
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	if (client <= 0)
+		return;
+	
+	bool zoomed = GetEntProp(client, Prop_Send, "m_iFOV") != 0;
+	if (zoomed)
+	{
+		ClearInspectHelpingHand(GetPlayerWeapon(client));
+	}
 }
 
 void Event_WeaponDrop(Event event, const char[] name, bool dontBroadcast)
@@ -473,6 +518,7 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 			// Allow ADS if: not a sniper
 			if (activeWeapon != -1 && !CanZoom(activeWeapon))
 			{
+				ClearInspectHelpingHand(activeWeapon);
 				SetupZoom(client, activeWeapon, !player[client].bZoom);
 			}
 		}
@@ -627,7 +673,9 @@ MRESReturn DhookCallback_ItemPostFrame(int weapon)
 		if(currenttime > player[client].primaryattacktime)
 		{
 			SetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack", currenttime);
+			ApplyAdsAttributes(client);
 			SDKCall(g_SDKCall_PrimaryAttack, weapon);
+			RestoreAdsAttributes(client);
 			SetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack", currenttime + 100.0);
 			player[client].primaryattacktime = currenttime + player[client].cycleTime;
 		}
@@ -636,7 +684,7 @@ MRESReturn DhookCallback_ItemPostFrame(int weapon)
 
 	int reserverammo = L4D_GetReserveAmmo(client, weapon);
 	
-	if((button & IN_RELOAD) || (clip == 0 && (reserverammo > 0 || player[client].isPistol)))
+	if((button & IN_RELOAD) || (clip == 0 && (reserverammo > 0 || (StrContains(player[client].weaponClass, "pistol", false) != -1))))
 	{
 		player[client].pendingDisableAdsFix = true;
 		return MRES_Ignored;
@@ -687,6 +735,11 @@ public Action OnCustomWeaponReload(int weapon)
 			{
 				// Play inspect animation (ACT_VM_FIDGET = 184)
 				SendWeaponAnim(weapon, 184);
+				// Hide the crosshair for the whole inspect: the engine only lets a shove
+				// (ACT_VM_MELEE) replace the playing view-model layer while it is hidden.
+				// ads_v1.982 gets this for free by parking m_helpingHandState on 7 until
+				// hide_effects_until expires; without it the fidget swallows the shove.
+				SetWeaponHelpingHandState(weapon, 7);
 				return Plugin_Handled;
 			}
 		}
@@ -848,6 +901,38 @@ void SetWeaponHelpingHandState(int weapon, int state)
 	SetEntProp(weapon, Prop_Send, "m_helpingHandState", state);
 }
 
+// Undoes the state 7 that OnCustomWeaponReload parks on the weapon for an inspect, and
+// drops the fidget off the view-model layer. State 7 doubles as the "inspecting" flag,
+// so no per-player bookkeeping is needed: 7 is only ever set here and ADS uses 6.
+// Only needed where no new weapon anim is played - anything that does play one (shove,
+// attack, reload, deploy) already resets both on its own.
+void ClearInspectHelpingHand(int weapon)
+{
+	if (weapon < 1 || !IsValidEntity(weapon))
+		return;
+
+	if (GetEntProp(weapon, Prop_Send, "m_helpingHandState") != 7)
+		return;
+
+	SetWeaponHelpingHandState(weapon, 0);
+	if (HasEntProp(weapon, Prop_Send, "m_helpingHandTarget"))
+		SetEntProp(weapon, Prop_Send, "m_helpingHandTarget", -1);
+
+	int owner = GetWeaponOwner(weapon);
+	if (owner < 1 || owner > MaxClients || !IsClientInGame(owner))
+		return;
+
+	int viewModel = GetEntPropEnt(owner, Prop_Send, "m_hViewModel");
+	if (viewModel < 1 || !IsValidEntity(viewModel))
+		return;
+
+	// Same cancel as ads_v1.982's SetViewAnimation(viewModel, -1, 0, Time): the fidget
+	// rides on m_nLayerSequence, so dropping the layer leaves the base idle playing.
+	SetEntProp(viewModel, Prop_Send, "m_nLayerSequence", -1);
+	SetEntProp(viewModel, Prop_Send, "m_nLayer", 0);
+	SetEntPropFloat(viewModel, Prop_Send, "m_flLayerStartTime", GetGameTime());
+}
+
 // #endregion
 // ============================================================================
 
@@ -878,9 +963,8 @@ void LoadPlayerWeaponAttributes(int client, int weapon)
 	// Get weapon classname
 	char classname[64];
 	GetEntityClassname(weapon, classname, sizeof(classname));
-	
-	// Load attributes using Left4DHooks
-	player[client].isPistol = StrContains(classname, "pistol", false) != -1;
+	strcopy(player[client].weaponClass, sizeof(player[].weaponClass), classname);
+	player[client].attrValid = L4D2_IsValidWeapon(classname);
 
 	float cycleTime = SDKCall(g_SDKCall_GetRateOfFire, weapon);
 
@@ -890,6 +974,47 @@ void LoadPlayerWeaponAttributes(int client, int weapon)
 	player[client].cycleTime = cycleTime;
 	float currentTime = GetGameTime();
 	player[client].primaryattacktime = currentTime + cycleTime;
+}
+
+// Scales down recoil / spread / pellet scatter for exactly one shot.
+// Safe despite the weapon-info database being global: the override window is the single
+// SDKCall below, inside this client's own ItemPostFrame, and the game re-reads these
+// fields at fire time. Values are read right before writing so we never fight another
+// plugin (or a weapon_reparse) with a stale cached original.
+void ApplyAdsAttributes(int client)
+{
+	g_bAttributeApplied	= false;
+
+	if (!player[client].attrValid)
+		return;
+
+	char classname[48];
+	strcopy(classname, sizeof(classname), player[client].weaponClass);
+
+	if (cvar.ads_attribute_mul != 1.0)
+	{
+		for (int i = 0; i < sizeof(WP_ATTRS); i++)
+		{
+			g_SavedAttributes[i] = L4D2_GetFloatWeaponAttribute(classname, WP_ATTRS[i]);
+			L4D2_SetFloatWeaponAttribute(classname, WP_ATTRS[i], g_SavedAttributes[i] * cvar.ads_attribute_mul);
+		}
+		g_bAttributeApplied = true;
+	}
+}
+
+void RestoreAdsAttributes(int client)
+{
+	if (!g_bAttributeApplied) return;
+
+	char classname[48];
+	strcopy(classname, sizeof(classname), player[client].weaponClass);
+
+	if (g_bAttributeApplied)
+	{
+		for (int i = 0; i < sizeof(WP_ATTRS); i++)
+			L4D2_SetFloatWeaponAttribute(classname, WP_ATTRS[i], g_SavedAttributes[i]);
+		g_bAttributeApplied = false;
+	}
 }
 
 void ToggleAdsFix(int client, int weapon, bool enable)
