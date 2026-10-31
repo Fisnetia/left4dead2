@@ -1,6 +1,6 @@
 /*
 *	Left 4 DHooks Direct
-*	Copyright (C) 2025 Silvers
+*	Copyright (C) 2026 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -37,6 +37,7 @@ void SetupForwardsNatives()
 	// ====================================================================================================
 	// FORWARDS
 	// List should match the CreateDetour list of forwards.
+	g_hFWD_OnMapStartPost													= new GlobalForward("L4D_OnLeft4DHooks_OnMapStart",						ET_Event);
 	g_hFWD_GameModeChange													= new GlobalForward("L4D_OnGameModeChange",								ET_Event, Param_Cell);
 	g_hFWD_ZombieManager_SpawnSpecial										= new GlobalForward("L4D_OnSpawnSpecial",								ET_Event, Param_CellByRef, Param_Array, Param_Array);
 	g_hFWD_ZombieManager_SpawnSpecial_Post									= new GlobalForward("L4D_OnSpawnSpecial_Post",							ET_Event, Param_Cell, Param_Cell, Param_Array, Param_Array);
@@ -158,9 +159,9 @@ void SetupForwardsNatives()
 	g_hFWD_CTerrorPlayer_Cough												= new GlobalForward("L4D_OnPlayerCough",								ET_Event, Param_Cell, Param_Cell);
 	g_hFWD_CTerrorPlayer_Cough_Post											= new GlobalForward("L4D_OnPlayerCough_Post",							ET_Event, Param_Cell, Param_Cell);
 	g_hFWD_CTerrorPlayer_Cough_PostHandled									= new GlobalForward("L4D_OnPlayerCough_PostHandled",					ET_Event, Param_Cell, Param_Cell);
-	g_hFWD_CTerrorPlayer_OnIncapacitatedAsSurvivor							= new GlobalForward("L4D_OnIncapacitated",								ET_Event, Param_Cell, Param_CellByRef, Param_CellByRef, Param_FloatByRef, Param_CellByRef);
-	g_hFWD_CTerrorPlayer_OnIncapacitatedAsSurvivor_Post						= new GlobalForward("L4D_OnIncapacitated_Post",							ET_Event, Param_Cell, Param_Cell, Param_Cell, Param_Float, Param_Cell);
-	g_hFWD_CTerrorPlayer_OnIncapacitatedAsSurvivor_PostHandled				= new GlobalForward("L4D_OnIncapacitated_PostHandled",					ET_Event, Param_Cell, Param_Cell, Param_Cell, Param_Float, Param_Cell);
+	g_hFWD_CTerrorPlayer_OnIncapacitatedAsSurvivor							= new GlobalForward("L4D_OnIncapacitated",								ET_Event, Param_Cell, Param_CellByRef, Param_CellByRef, Param_FloatByRef, Param_CellByRef, Param_CellByRef);
+	g_hFWD_CTerrorPlayer_OnIncapacitatedAsSurvivor_Post						= new GlobalForward("L4D_OnIncapacitated_Post",							ET_Event, Param_Cell, Param_Cell, Param_Cell, Param_Float, Param_Cell, Param_Cell);
+	g_hFWD_CTerrorPlayer_OnIncapacitatedAsSurvivor_PostHandled				= new GlobalForward("L4D_OnIncapacitated_PostHandled",					ET_Event, Param_Cell, Param_Cell, Param_Cell, Param_Float, Param_Cell, Param_Cell);
 	g_hFWD_Witch_SetHarasser												= new GlobalForward("L4D_OnWitchSetHarasser",							ET_Event, Param_Cell, Param_Cell);
 	g_hFWD_Tank_EnterStasis_Post											= new GlobalForward("L4D_OnEnterStasis",								ET_Event, Param_Cell);
 	g_hFWD_Tank_LeaveStasis_Post											= new GlobalForward("L4D_OnLeaveStasis",								ET_Event, Param_Cell);
@@ -171,6 +172,8 @@ void SetupForwardsNatives()
 	// g_hFWD_BossZombiePlayerBot_ChooseVictim_Pre								= new GlobalForward("L4D2_OnChooseVictim_Pre",							ET_Event, Param_Cell, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef); // For a future update
 	g_hFWD_BossZombiePlayerBot_ChooseVictim_Pre								= new GlobalForward("L4D2_OnChooseVictim_Pre",							ET_Event, Param_Cell, Param_CellByRef);
 	g_hFWD_BossZombiePlayerBot_ChooseVictim_Post							= new GlobalForward("L4D2_OnChooseVictim",								ET_Event, Param_Cell, Param_CellByRef);
+	g_hFWD_CTerrorPlayer_SetClass											= new GlobalForward("L4D_OnSetClass",									ET_Event, Param_Cell, Param_CellByRef);
+	g_hFWD_CTerrorPlayer_SetClass_Post										= new GlobalForward("L4D_OnSetClass_Post",								ET_Event, Param_Cell, Param_Cell);
 	g_hFWD_CTerrorPlayer_MaterializeFromGhost_Pre							= new GlobalForward("L4D_OnMaterializeFromGhostPre",					ET_Event, Param_Cell);
 	g_hFWD_CTerrorPlayer_MaterializeFromGhost_Post							= new GlobalForward("L4D_OnMaterializeFromGhost",						ET_Event, Param_Cell);
 	g_hFWD_CTerrorPlayer_MaterializeFromGhost_PostHandled					= new GlobalForward("L4D_OnMaterializeFromGhost_PostHandled",			ET_Event, Param_Cell);
@@ -200,6 +203,16 @@ void SetupForwardsNatives()
 	g_hFWD_CFirstAidKit_StartHealing										= new GlobalForward("L4D1_FirstAidKit_StartHealing",					ET_Event, Param_Cell, Param_Cell);
 	g_hFWD_CFirstAidKit_StartHealing_Post									= new GlobalForward("L4D1_FirstAidKit_StartHealing_Post",				ET_Event, Param_Cell, Param_Cell);
 	g_hFWD_CFirstAidKit_StartHealing_PostHandled							= new GlobalForward("L4D1_FirstAidKit_StartHealing_PostHandled",		ET_Event, Param_Cell, Param_Cell);
+	g_hFWD_CTongue_ActivateAbility											= new GlobalForward("L4D_ActivateAbility_Smoker",						ET_Event, Param_Cell, Param_Cell);
+	g_hFWD_CTongue_ActivateAbility_Post										= new GlobalForward("L4D_ActivateAbility_Smoker_Post",					ET_Event, Param_Cell, Param_Cell);
+	g_hFWD_CTongue_ActivateAbility_PostHandled								= new GlobalForward("L4D_ActivateAbility_Smoker_PostHandled",			ET_Event, Param_Cell, Param_Cell);
+	g_hFWD_CVomit_ActivateAbility											= new GlobalForward("L4D_ActivateAbility_Boomer",						ET_Event, Param_Cell, Param_Cell);
+	g_hFWD_CVomit_ActivateAbility_Post										= new GlobalForward("L4D_ActivateAbility_Boomer_Post",					ET_Event, Param_Cell, Param_Cell);
+	g_hFWD_CVomit_ActivateAbility_PostHandled								= new GlobalForward("L4D_ActivateAbility_Boomer_PostHandled",			ET_Event, Param_Cell, Param_Cell);
+	g_hFWD_CLunge_ActivateAbility											= new GlobalForward("L4D_ActivateAbility_Hunter",						ET_Event, Param_Cell, Param_Cell);
+	g_hFWD_CLunge_ActivateAbility_Post										= new GlobalForward("L4D_ActivateAbility_Hunter_Post",					ET_Event, Param_Cell, Param_Cell);
+	g_hFWD_CLunge_ActivateAbility_PostHandled								= new GlobalForward("L4D_ActivateAbility_Hunter_PostHandled",			ET_Event, Param_Cell, Param_Cell);
+
 	// g_hFWD_GetRandomPZSpawnPos												= new GlobalForward("L4D_OnGetRandomPZSpawnPosition",					ET_Event, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_Array);
 	// g_hFWD_InfectedShoved													= new GlobalForward("L4D_OnInfectedShoved",								ET_Event, Param_Cell, Param_Cell);
 	// g_hFWD_OnWaterMove														= new GlobalForward("L4D2_OnWaterMove",									ET_Event, Param_Cell);
@@ -215,17 +228,16 @@ void SetupForwardsNatives()
 		g_hFWD_InfoChangelevel_SaveEntities									= new GlobalForward("L4D1_OnSavingEntities",							ET_Event, Param_Cell, Param_Cell);
 		g_hFWD_InfoChangelevel_SaveEntities_Post							= new GlobalForward("L4D1_OnSavingEntities_Post",						ET_Event, Param_Cell, Param_Cell);
 		g_hFWD_InfoChangelevel_SaveEntities_PostHandled						= new GlobalForward("L4D1_OnSavingEntities_PostHandled",				ET_Event, Param_Cell, Param_Cell);
+	}
 
+	if( g_bLeft4Dead2 )
+	{
 		g_hFWD_CTerrorPlayer_TransitionRestore								= new GlobalForward("L4D2_OnTransitionRestore",							ET_Event, Param_Cell);
 		g_hFWD_CTerrorPlayer_TransitionRestore_Post							= new GlobalForward("L4D2_OnTransitionRestore_Post",					ET_Event, Param_Cell, Param_Cell);
 		g_hFWD_CTerrorPlayer_TransitionRestore_PostHandled					= new GlobalForward("L4D2_OnTransitionRestore_PostHandled",				ET_Event, Param_Cell, Param_Cell);
 		g_hFWD_RestoreTransitionedSurvivorBots								= new GlobalForward("L4D2_OnRestoreTransitionedSurvivorBots",			ET_Event);
 		g_hFWD_RestoreTransitionedSurvivorBots_Post							= new GlobalForward("L4D2_OnRestoreTransitionedSurvivorBots_Post",		ET_Event);
 		g_hFWD_RestoreTransitionedSurvivorBots_PostHandled					= new GlobalForward("L4D2_OnRestoreTransitionedSurvivorBots_PostHandled",	ET_Event);
-	}
-
-	if( g_bLeft4Dead2 )
-	{
 		g_hFWD_CVomitJarProjectile_Create_Pre								= new GlobalForward("L4D2_VomitJarProjectile_Pre",						ET_Event, Param_Cell, Param_Array, Param_Array, Param_Array, Param_Array);
 		g_hFWD_CVomitJarProjectile_Create_Post								= new GlobalForward("L4D2_VomitJarProjectile_Post",						ET_Event, Param_Cell, Param_Cell, Param_Array, Param_Array, Param_Array, Param_Array);
 		g_hFWD_CVomitJarProjectile_Create_PostHandled						= new GlobalForward("L4D2_VomitJarProjectile_PostHandled",				ET_Event, Param_Cell, Param_Cell, Param_Array, Param_Array, Param_Array, Param_Array);
@@ -273,6 +285,15 @@ void SetupForwardsNatives()
 		g_hFWD_Infected_OnHitByVomitJar										= new GlobalForward("L4D2_Infected_HitByVomitJar",						ET_Event, Param_Cell, Param_CellByRef);
 		g_hFWD_Infected_OnHitByVomitJar_Post								= new GlobalForward("L4D2_Infected_HitByVomitJar_Post",					ET_Event, Param_Cell, Param_Cell);
 		g_hFWD_Infected_OnHitByVomitJar_PostHandled							= new GlobalForward("L4D2_Infected_HitByVomitJar_PostHandled",			ET_Event, Param_Cell, Param_Cell);
+		g_hFWD_CLeap_ActivateAbility										= new GlobalForward("L4D2_ActivateAbility_Jockey",						ET_Event, Param_Cell, Param_Cell);
+		g_hFWD_CLeap_ActivateAbility_Post									= new GlobalForward("L4D2_ActivateAbility_Jockey_Post",					ET_Event, Param_Cell, Param_Cell);
+		g_hFWD_CLeap_ActivateAbility_PostHandled							= new GlobalForward("L4D2_ActivateAbility_Jockey_PostHandled",			ET_Event, Param_Cell, Param_Cell);
+		g_hFWD_CSpitAbility_ActivateAbility									= new GlobalForward("L4D2_ActivateAbility_Spitter",						ET_Event, Param_Cell, Param_Cell);
+		g_hFWD_CSpitAbility_ActivateAbility_Post							= new GlobalForward("L4D2_ActivateAbility_Spitter_Post",				ET_Event, Param_Cell, Param_Cell);
+		g_hFWD_CSpitAbility_ActivateAbility_PostHandled						= new GlobalForward("L4D2_ActivateAbility_Spitter_PostHandled",			ET_Event, Param_Cell, Param_Cell);
+		g_hFWD_CCharge_ActivateAbility										= new GlobalForward("L4D2_ActivateAbility_Charger",						ET_Event, Param_Cell, Param_Cell);
+		g_hFWD_CCharge_ActivateAbility_Post									= new GlobalForward("L4D2_ActivateAbility_Charger_Post",				ET_Event, Param_Cell, Param_Cell);
+		g_hFWD_CCharge_ActivateAbility_PostHandled							= new GlobalForward("L4D2_ActivateAbility_Charger_PostHandled",			ET_Event, Param_Cell, Param_Cell);
 		g_hFWD_CDirector_GetScriptValueInt									= new GlobalForward("L4D_OnGetScriptValueInt",							ET_Event, Param_String, Param_CellByRef);
 		g_hFWD_CDirector_GetScriptValueFloat								= new GlobalForward("L4D_OnGetScriptValueFloat",						ET_Event, Param_String, Param_FloatByRef);
 		// g_hFWD_CDirector_GetScriptValueVector								= new GlobalForward("L4D_OnGetScriptValueVector",						ET_Event, Param_String, Param_Array);
@@ -312,6 +333,10 @@ void SetupForwardsNatives()
 	CreateNative("AnimGetActivity",		 							Native_AnimGetActivity);
 	CreateNative("AnimGetFromActivity",		 						Native_AnimGetFromActivity);
 
+	// ENTITY INPUT/OUTPUT HOOK
+	CreateNative("L4D_HookEntityInput",								Native_HookEntityInput);
+	CreateNative("L4D_UnhookEntityInput",							Native_UnhookEntityInput);
+
 
 
 	// =========================
@@ -348,15 +373,27 @@ void SetupForwardsNatives()
 	CreateNative("L4D_OnITExpired",		 							Native_CTerrorPlayer_OnITExpired);
 	CreateNative("L4D_EstimateFallingDamage",		 				Native_CTerrorPlayer_EstimateFallingDamage);
 	CreateNative("L4D_GetEntityWorldSpaceCenter",		 			Native_CBaseEntity_WorldSpaceCenter);
+	CreateNative("L4D_GetMass",		 								Native_GetMass);
+	CreateNative("L4D_SetMass",		 								Native_SetMass);
 	CreateNative("L4D_AngularVelocity",		 						Native_CBaseEntity_ApplyLocalAngularVelocityImpulse);
 	CreateNative("L4D_GetRandomPZSpawnPosition",		 			Native_ZombieManager_GetRandomPZSpawnPosition);
 	CreateNative("L4D_FindRandomSpot",		 						Native_TerrorNavArea_FindRandomSpot);
 	CreateNative("L4D_WarpToValidPositionIfStuck",		 			Native_CTerrorPlayer_WarpToValidPositionIfStuck);
 	CreateNative("L4D2_GetSpecialInfectedDominatingMe",				Native_CTerrorPlayer_GetSpecialInfectedDominatingMe);
 	CreateNative("L4D2_IsVisibleToPlayer",		 					Native_IsVisibleToPlayer);
+	CreateNative("L4D_IsPotentiallyVisibleToTeam",		 			Native_IsPotentiallyVisibleToTeam);
+	CreateNative("L4D_IsPotentiallyVisible",		 				Native_IsPotentiallyVisible);
+	CreateNative("L4D_IsCompletelyVisibleToTeam",		 			Native_IsCompletelyVisibleToTeam);
+	CreateNative("L4D_IsCompletelyVisible",		 					Native_IsCompletelyVisible);
+	CreateNative("L4D_GetClusterForOrigin",		 					Native_GetClusterForOrigin);
+	CreateNative("L4D_GetPVSForCluster",		 					Native_GetPVSForCluster);
+	CreateNative("L4D_CheckOriginInPVS",		 					Native_CheckOriginInPVS);
 	CreateNative("L4D_GetNearestNavArea",		 					Native_CNavMesh_GetNearestNavArea);
 	CreateNative("L4D_GetLastKnownArea",		 					Native_CTerrorPlayer_GetLastKnownArea);
 	CreateNative("L4D_IsTouchingTrigger",		 					Native_CBaseTrigger_IsTouching);
+	CreateNative("L4D_FindEntityByClassnameNearest",		 		Native_CGlobalEntityList_FindEntityByClassnameNearest);
+	CreateNative("L4D_FindEntityByClassnameWithin",		 			Native_CGlobalEntityList_FindEntityByClassnameWithin);
+	CreateNative("L4D_FindByClassnameTargetname",		 			Native_FindByClassnameTargetname);
 	CreateNative("L4D_HasAnySurvivorLeftSafeArea",		 			Native_CDirector_HasAnySurvivorLeftSafeArea);
 	CreateNative("L4D_IsAnySurvivorInStartArea",		 			Native_CDirector_IsAnySurvivorInStartArea);
 	CreateNative("L4D_IsAnySurvivorInCheckpoint",		 			Native_CDirector_IsAnySurvivorInCheckpoint);
@@ -411,6 +448,8 @@ void SetupForwardsNatives()
 	CreateNative("L4D2_NavAreaTravelDistance",		 				Native_NavAreaTravelDistance);
 	CreateNative("L4D2_NavAreaBuildPath",							Native_NavAreaBuildPath);
 	CreateNative("L4D2_CommandABot",								Native_CommandABot);
+	CreateNative("L4D2_RushVictim",									Native_RushVictim);
+	CreateNative("L4D2_StartAssault",								Native_StartAssault);
 
 	CreateNative("L4D2_VScriptWrapper_GetMapNumber",				Native_VS_GetMapNumber);
 	CreateNative("L4D2_VScriptWrapper_HasEverBeenInjured",			Native_VS_HasEverBeenInjured);
@@ -453,7 +492,15 @@ void SetupForwardsNatives()
 	CreateNative("L4D_GetNavAreaPos",								Native_GetNavAreaPos);
 	CreateNative("L4D_GetNavAreaCenter",							Native_GetNavAreaCenter);
 	CreateNative("L4D_GetNavAreaSize",								Native_GetNavAreaSize);
+	CreateNative("L4D_NavArea_GetCorner",							Native_NavArea_GetCorner);
+	CreateNative("L4D_NavArea_GetZ",								Native_NavArea_GetZ);
+	CreateNative("L4D_NavArea_GetAdjacentCount",					Native_CNavArea_GetAdjacentCount);
+	CreateNative("L4D_NavArea_GetAdjacentAreas",					Native_CNavArea_GetAdjacentAreas);
+	CreateNative("L4D_NavArea_ConnectTo",							Native_CNavArea_ConnectTo);
 	CreateNative("L4D_NavArea_IsConnected",							Native_CNavArea_IsConnected);
+	CreateNative("L4D_NavArea_IsBlocked",							Native_CNavArea_IsBlocked);
+	CreateNative("L4D_NavArea_GetElevator",							Native_CNavArea_GetElevator);
+	CreateNative("L4D_NavArea_GetLadder",							Native_CNavArea_GetLadder);
 	CreateNative("L4D_GetNavArea_SpawnAttributes",					Native_GetTerrorNavArea_Attributes);
 	CreateNative("L4D_SetNavArea_SpawnAttributes",					Native_SetTerrorNavArea_Attributes);
 	CreateNative("L4D_GetNavArea_AttributeFlags",					Native_GetCNavArea_AttributeFlags);
@@ -539,6 +586,7 @@ void SetupForwardsNatives()
 	CreateNative("L4D2Direct_GetTerrorNavArea",						Direct_GetTerrorNavArea);
 	CreateNative("L4D2Direct_GetTerrorNavAreaFlow",					Direct_GetTerrorNavAreaFlow);
 	CreateNative("L4D2Direct_TryOfferingTankBot",					Direct_TryOfferingTankBot);
+	CreateNative("L4D2Direct_AddSurvivorBot",						Direct_AddSurvivorBot);
 	CreateNative("L4D2Direct_GetFlowDistance",						Direct_GetFlowDistance);
 	CreateNative("L4D2Direct_DoAnimationEvent",						Direct_DoAnimationEvent);
 	CreateNative("L4DDirect_GetSurvivorHealthBonus",				Direct_GetSurvivorHealthBonus);
