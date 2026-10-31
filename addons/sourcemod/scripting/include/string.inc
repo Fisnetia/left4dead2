@@ -165,6 +165,12 @@ native int Format(char[] buffer, int maxlength, const char[] format, any ...);
  */
 native int FormatEx(char[] buffer, int maxlength, const char[] format, any ...);
 
+#if defined __sourcepawn2
+
+// #pragma deprecated VFormat got replaced by spreading the variable arguments in SourcePawn 2: Format(buffer, sizeof(buffer), format, ...)
+#define VFormat(%1,%2,%3,%4) Format(%1, %2, %3, ...)
+
+#else
 /**
  * Formats a string according to the SourceMod format rules (see documentation).
  * @note This is the same as Format(), except it grabs parameters from a 
@@ -181,6 +187,7 @@ native int FormatEx(char[] buffer, int maxlength, const char[] format, any ...);
  * @error               Invalid argument index.
  */
 native int VFormat(char[] buffer, int maxlength, const char[] format, int varpos);
+#endif
 
 /**
  * Converts a string to an integer.
@@ -204,6 +211,10 @@ native int StringToIntEx(const char[] str, int &result, int nBase=10);
 /**
  * Converts a string to a 64-bit integer.
  *
+ * @note If the value is outside the range of representable values,
+ *       If the value is positive, this function will return INT64_MAX.
+ *       If the value is negative, this function will return INT64_MIN.
+ *
  * @param str           String to convert.
  * @param result        Array to store the upper and lower
  *                      32-bits of the 64-bit integer.
@@ -211,6 +222,20 @@ native int StringToIntEx(const char[] str, int &result, int nBase=10);
  * @return              Number of characters consumed.
  */
 native int StringToInt64(const char[] str, int result[2], int nBase=10);
+
+/**
+ * Converts a string to an int64 type value.
+ *
+ * @note If the value is outside the range of representable values,
+ *       If the value is positive, this function will return INT64_MAX.
+ *       If the value is negative, this function will return INT64_MIN.
+ *
+ * @param str           String to convert.
+ * @param nBase         Numerical base to use.  10 is default.
+ * @param nConsumed     Number of characters consumed.
+ * @return              int64 conversion of string, or 0 on failure.
+ */
+native int64 StringToI64(const char[] str, int nBase=10, int &nConsumed=0);
 
 /**
  * Converts an integer to a string.
@@ -224,7 +249,7 @@ native int StringToInt64(const char[] str, int result[2], int nBase=10);
 native int IntToString(int num, char[] str, int maxlength);
 
 /**
- * Converts a 64-bit integer to a string.
+ * Converts a 64-bit integer in the legacy 2-cell representation to a string.
  *
  * @param num           Array containing the upper and lower
  *                      32-bits of a 64-bit integer.
@@ -234,6 +259,20 @@ native int IntToString(int num, char[] str, int maxlength);
  *                      not including the null terminator.
  */
 native int Int64ToString(const int num[2], char[] str, int maxlength);
+
+/**
+ * Converts an int64 value to a string.
+ *
+ * @param num           int64 value to convert.
+ * @param str           Buffer to store string in.
+ * @param maxlength     Maximum length of string buffer.
+ * @return              Number of characters written to the buffer,
+ *                      not including the null terminator.
+ */
+stock int Int64ToStringEx(int64 num, char[] str, int maxlength)
+{
+	return Format(str, maxlength, "%li", num);
+}
 
 /** 
  * Converts a string to a floating point number.

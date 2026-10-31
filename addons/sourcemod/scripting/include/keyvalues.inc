@@ -62,6 +62,19 @@ methodmap KeyValues < Handle
 	// @param firstValue    If firstKey is non-empty, specifies the first key's value.
 	public native KeyValues(const char[] name, const char[] firstKey="", const char[] firstValue="");
 
+	// Wraps an existing native KeyValues pointer in a KeyValues Handle, for
+	// example one obtained from the game through an SDKCall or a detour.
+	//
+	// The returned Handle does NOT own the underlying KeyValues: closing or
+	// deleting it will not free the pointed-to memory (which is owned by
+	// whoever created it, typically the game). The Handle must not be used
+	// after the underlying KeyValues has been freed.
+	//
+	// @param pKeyValues    Address of a native KeyValues object.
+	// @return              A KeyValues Handle wrapping the given pointer.
+	// @error               Address is null.
+	public static native KeyValues FromAddress(Address pKeyValues);
+
 	// Exports a KeyValues tree to a file. The tree is dumped from the current position.
 	//
 	// @param file          File to dump write to.
@@ -334,6 +347,13 @@ methodmap KeyValues < Handle
 	// @param id            Id of the current section.
 	// @return              True on success, false on failure.
 	public native bool GetSectionSymbol(int &id);
+
+	// Merge from the current position of another KeyValues into the current
+	// position of this one.
+	//
+	// @param other         KeyValues Handle to merge from.
+	// @error               Invalid Handle or unsupported engine version.
+	public native void Merge(KeyValues other);
 };
 
 /**
