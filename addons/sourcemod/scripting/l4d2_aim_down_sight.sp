@@ -28,6 +28,9 @@ public Plugin myinfo =
 
 #define DEFAULT_ATTACK2_TIME 	0.7
 #define SCAR_WORLD_MODEL 		"models/w_models/weapons/w_desert_rifle.mdl"
+#define ATTRIBUTE_MUL_PATH		"data/l4d2_aim_down_sight/l4d2_aim_down_sight_attribute_mul.txt"
+
+#define WP_ATTR_COUNT			2	// = sizeof(WP_ATTRS)
 
 // #endregion
 // ============================================================================
@@ -75,46 +78,57 @@ enum struct PlayerData
 	float cycleTime;
 
 	char weaponClass[48];
-	bool attrValid;
+	float attrMul[WP_ATTR_COUNT];	// attribute_mul of weaponClass, cached on ADS enable
 }
 PlayerData
 	player[MAXPLAYERS + 1];
 
 ConVar
 	cvar_ads_debug,
-	cvar_ads_key,
-	cvar_ads_cycletime_mul,
-	cvar_ads_cycletime_scar,
-	cvar_ads_attribute_mul;
+	cvar_ads_key;
 enum struct GlobalConVar
 {
 	bool ads_debug;
 	int ads_key;
-	float ads_cycletime_mul;
-	float ads_cycletime_scar;
-	float ads_attribute_mul;
 }
 GlobalConVar
 	cvar;
 
+// Weapon-info attributes scaled around the ADS shot, with their key names in the attribute_mul config.
+// "CycleTime" is handled separately: it scales the plugin's own ADS fire interval.
 L4D2FloatWeaponAttributes
-	WP_ATTRS[] =
+	WP_ATTRS[WP_ATTR_COUNT] =
 {
-	L4D2FWA_MaxSpread
-	//  L4D2FWA_SpreadPerShot
-	// ,L4D2FWA_MaxSpread
-	// ,L4D2FWA_MinDuckingSpread
-	// ,L4D2FWA_MinStandingSpread
-	// ,L4D2FWA_MinInAirSpread
-	// ,L4D2FWA_MaxMovementSpread
-	// ,L4D2FWA_VerticalPunch
-	// ,L4D2FWA_HorizontalPunch
-	// ,L4D2FWA_PelletScatterPitch
-	// ,L4D2FWA_PelletScatterYaw
+	 L4D2FWA_SpreadPerShot
+	,L4D2FWA_MaxSpread
 };
 
+char
+	WP_ATTR_NAMES[WP_ATTR_COUNT][] =
+{
+	 "SpreadPerShot"
+	,"MaxSpread"
+};
+
+// Multipliers applied while ADS. 1.0 = untouched.
+enum struct AttributeMul
+{
+	float cycleTime;
+	float attr[WP_ATTR_COUNT];
+
+	void Reset()
+	{
+		this.cycleTime = 1.0;
+		for (int i = 0; i < WP_ATTR_COUNT; i++)
+			this.attr[i] = 1.0;
+	}
+}
+
+StringMap
+	g_AttributeMulMap;		// weapon classname -> AttributeMul
+
 float
-	g_SavedAttributes[sizeof(WP_ATTRS)];
+	g_SavedAttributes[WP_ATTR_COUNT];
 
 bool
 	g_bAttributeApplied;
@@ -144,10 +158,21 @@ public void OnPluginStart()
 	LoadGameData();
 	LoadActivityList();
 	LoadWeaponData();
+	LoadAttributeMulData();
 	LoadConVars();
 	HookEvents();
 
+	RegAdminCmd("sm_ads_reload", Cmd_AdsReload, ADMFLAG_CONFIG, "Reload ADS sequence override and attribute multiplier configs");
+
 	g_WeaponHookAdsFixIds = new StringMap();
+}
+
+Action Cmd_AdsReload(int client, int args)
+{
+	LoadWeaponData();
+	LoadAttributeMulData();
+	ReplyToCommand(client, "[ADS] Configs reloaded (%d weapon attribute entries).", g_AttributeMulMap.Size);
+	return Plugin_Handled;
 }
 
 public void OnMapStart()
@@ -168,7 +193,8 @@ public void OnClientConnected(int client)
 	player[client].cycleTime					= 0.0;
 
 	player[client].weaponClass[0]				= '\0';
-	player[client].attrValid					= false;
+	for (int i = 0; i < WP_ATTR_COUNT; i++)
+		player[client].attrMul[i]				= 1.0;
 }
 
 public void OnClientPutInServer(int client)
@@ -344,12 +370,89 @@ void LoadWeaponData()
 	delete hWeaponData;
 	hWeaponData = new KeyValues("");
 	char buffer[PLATFORM_MAX_PATH];
-	BuildPath(Path_SM, buffer, sizeof(buffer), "data/l4d2_aim_down_sight.txt");
+	BuildPath(Path_SM, buffer, sizeof(buffer), "data/l4d2_aim_down_sight/l4d2_aim_down_sight_sequence_override.txt");
 	
 	if (!hWeaponData.ImportFromFile(buffer))
 	{
 		LogError("[ADS] Failed to load weapon data from %s", buffer);
 	}
+}
+
+// Missing keys and unlisted weapons = 1.0 (no change).
+void LoadAttributeMulData()
+{
+	if (g_AttributeMulMap == null)
+		g_AttributeMulMap = new StringMap();
+	else
+		g_AttributeMulMap.Clear();
+
+	char buffer[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, buffer, sizeof(buffer), ATTRIBUTE_MUL_PATH);
+
+	KeyValues kv = new KeyValues("Weapon");
+	if (!kv.ImportFromFile(buffer))
+	{
+		LogError("[ADS] Failed to load attribute multipliers from %s", buffer);
+		delete kv;
+		return;
+	}
+
+	char weaponClass[48], key[32];
+	AttributeMul mul;
+	if (kv.GotoFirstSubKey())
+	{
+		do
+		{
+			kv.GetSectionName(weaponClass, sizeof(weaponClass));
+			mul.Reset();
+
+			if (kv.GotoFirstSubKey(false))
+			{
+				do
+				{
+					kv.GetSectionName(key, sizeof(key));
+					float value = kv.GetFloat(NULL_STRING, 1.0);
+					if (value < 0.0 || (value == 0.0 && strcmp(key, "CycleTime", false) == 0))
+						LogError("[ADS] %s: invalid value %.3f for \"%s\", ignored", weaponClass, value, key);
+					else if (!SetAttributeMul(mul, key, value))
+						LogError("[ADS] %s: unknown attribute \"%s\", ignored", weaponClass, key);
+				}
+				while (kv.GotoNextKey(false));
+				kv.GoBack();
+			}
+
+			g_AttributeMulMap.SetArray(weaponClass, mul, sizeof(mul));
+		}
+		while (kv.GotoNextKey());
+	}
+
+	delete kv;
+}
+
+bool SetAttributeMul(AttributeMul mul, const char[] key, float value)
+{
+	if (strcmp(key, "CycleTime", false) == 0)
+	{
+		mul.cycleTime = value;
+		return true;
+	}
+
+	for (int i = 0; i < WP_ATTR_COUNT; i++)
+	{
+		if (strcmp(key, WP_ATTR_NAMES[i], false) == 0)
+		{
+			mul.attr[i] = value;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void GetAttributeMul(const char[] classname, AttributeMul mul)
+{
+	if (!g_AttributeMulMap.GetArray(classname, mul, sizeof(mul)))
+		mul.Reset();
 }
 
 // Cvars
@@ -358,14 +461,8 @@ void LoadConVars()
 	// Create ConVars
 	cvar_ads_debug = 			CreateConVar("ads_debug", "0", "Enable debug messages for ADS plugin");
 	cvar_ads_key = 				CreateConVar("ads_key", "0", "Key to activate ADS. 0 = Zoom key (MOUSE 3), 1 = Walk key (SHIFT), 2 = Duck key (CTRL)");
-	cvar_ads_cycletime_mul = 	CreateConVar("ads_cycletime_mul", "1.1", "ADS cycle-time multiplier. > 1.0 makes ADS slower, 1.0 keeps default.", FCVAR_NONE, true, 1.0);
-	cvar_ads_cycletime_scar = 	CreateConVar("ads_cycletime_scar", "0.12", "Override cycle time for SCAR");
-	cvar_ads_attribute_mul = 		CreateConVar("ads_attribute_mul", "0.5", "Bullet spread multiplier while ADS is active. 1.0 = unchanged, 0.0 = perfect accuracy.", FCVAR_NONE, true, 0.0, true, 1.0);
 	cvar_ads_debug.AddChangeHook(OnConVarChanged);
 	cvar_ads_key.AddChangeHook(OnConVarChanged);
-	cvar_ads_cycletime_mul.AddChangeHook(OnConVarChanged);
-	cvar_ads_cycletime_scar.AddChangeHook(OnConVarChanged);
-	cvar_ads_attribute_mul.AddChangeHook(OnConVarChanged);
 	GetConVars();
 	AutoExecConfig(true, "l4d2_aim_down_sight");
 }
@@ -374,9 +471,6 @@ void GetConVars()
 {
 	cvar.ads_debug = cvar_ads_debug.BoolValue;
 	cvar.ads_key = cvar_ads_key.IntValue;
-	cvar.ads_cycletime_mul = cvar_ads_cycletime_mul.FloatValue;
-	cvar.ads_cycletime_scar = cvar_ads_cycletime_scar.FloatValue;
-	cvar.ads_attribute_mul = cvar_ads_attribute_mul.FloatValue;
 }
 
 public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -964,19 +1058,25 @@ void LoadPlayerWeaponAttributes(int client, int weapon)
 	char classname[64];
 	GetEntityClassname(weapon, classname, sizeof(classname));
 	strcopy(player[client].weaponClass, sizeof(player[].weaponClass), classname);
-	player[client].attrValid = L4D2_IsValidWeapon(classname);
 
-	float cycleTime = SDKCall(g_SDKCall_GetRateOfFire, weapon);
+	AttributeMul mul;
+	GetAttributeMul(classname, mul);
+	for (int i = 0; i < WP_ATTR_COUNT; i++)
+		player[client].attrMul[i] = mul.attr[i];
 
-	if (cvar.ads_cycletime_scar > 0.0 && GetEntProp(weapon, Prop_Send, "m_iWorldModelIndex") == g_scar_precache_index) cycleTime = cvar.ads_cycletime_scar;
-	if (cvar.ads_cycletime_mul > 1.0) cycleTime *= cvar.ads_cycletime_mul;
+	float cycleTime = 0.0;
+
+	if (GetEntProp(weapon, Prop_Send, "m_iWorldModelIndex") == g_scar_precache_index) 
+		cycleTime = mul.cycleTime;
+	else
+    	cycleTime = view_as<float>(SDKCall(g_SDKCall_GetRateOfFire, weapon)) * mul.cycleTime;
 
 	player[client].cycleTime = cycleTime;
 	float currentTime = GetGameTime();
 	player[client].primaryattacktime = currentTime + cycleTime;
 }
 
-// Scales down recoil / spread / pellet scatter for exactly one shot.
+// Scales the weapon's attributes (per the attribute_mul config) for exactly one shot.
 // Safe despite the weapon-info database being global: the override window is the single
 // SDKCall below, inside this client's own ItemPostFrame, and the game re-reads these
 // fields at fire time. Values are read right before writing so we never fight another
@@ -985,19 +1085,13 @@ void ApplyAdsAttributes(int client)
 {
 	g_bAttributeApplied	= false;
 
-	if (!player[client].attrValid)
-		return;
-
-	char classname[48];
-	strcopy(classname, sizeof(classname), player[client].weaponClass);
-
-	if (cvar.ads_attribute_mul != 1.0)
+	for (int i = 0; i < WP_ATTR_COUNT; i++)
 	{
-		for (int i = 0; i < sizeof(WP_ATTRS); i++)
-		{
-			g_SavedAttributes[i] = L4D2_GetFloatWeaponAttribute(classname, WP_ATTRS[i]);
-			L4D2_SetFloatWeaponAttribute(classname, WP_ATTRS[i], g_SavedAttributes[i] * cvar.ads_attribute_mul);
-		}
+		if (player[client].attrMul[i] == 1.0)
+			continue;
+
+		g_SavedAttributes[i] = L4D2_GetFloatWeaponAttribute(player[client].weaponClass, WP_ATTRS[i]);
+		L4D2_SetFloatWeaponAttribute(player[client].weaponClass, WP_ATTRS[i], g_SavedAttributes[i] * player[client].attrMul[i]);
 		g_bAttributeApplied = true;
 	}
 }
@@ -1006,15 +1100,13 @@ void RestoreAdsAttributes(int client)
 {
 	if (!g_bAttributeApplied) return;
 
-	char classname[48];
-	strcopy(classname, sizeof(classname), player[client].weaponClass);
-
-	if (g_bAttributeApplied)
+	for (int i = 0; i < WP_ATTR_COUNT; i++)
 	{
-		for (int i = 0; i < sizeof(WP_ATTRS); i++)
-			L4D2_SetFloatWeaponAttribute(classname, WP_ATTRS[i], g_SavedAttributes[i]);
-		g_bAttributeApplied = false;
+		if (player[client].attrMul[i] != 1.0)
+			L4D2_SetFloatWeaponAttribute(player[client].weaponClass, WP_ATTRS[i], g_SavedAttributes[i]);
 	}
+
+	g_bAttributeApplied = false;
 }
 
 void ToggleAdsFix(int client, int weapon, bool enable)

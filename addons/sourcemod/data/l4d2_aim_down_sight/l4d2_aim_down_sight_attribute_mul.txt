@@ -1,0 +1,59 @@
+// ADS attribute multipliers per weapon classname. 1.0 = unchanged.
+// Missing keys and unlisted weapons = 1.0 (no change).
+// Reload in-game with: ads_reload
+//
+// CycleTime            ADS fire interval multiplier (> 1.0 = slower)
+// SpreadPerShot        Spread added per shot
+// MaxSpread            Spread cap
+"Weapon"
+{
+	"weapon_smg"
+    {
+        "CycleTime"         "1.2"
+        "SpreadPerShot"     "0.4"
+        "MaxSpread"         "0.4"
+    }
+
+	"weapon_smg_silenced"
+    {
+        "CycleTime"         "1.2"
+        "SpreadPerShot"     "0.4"
+        "MaxSpread"         "0.4"
+    }
+
+	"weapon_smg_mp5"
+    {
+        "CycleTime"         "1.2"
+        "SpreadPerShot"     "0.4"
+        "MaxSpread"         "0.4"
+    }
+
+    "weapon_rifle"
+    {
+        "CycleTime"         "1.2"
+        "SpreadPerShot"     "0.4"
+        "MaxSpread"         "0.4"
+    }
+
+	"weapon_rifle_ak47"
+    {
+        "CycleTime"         "1.2"
+        "SpreadPerShot"     "0.4"
+        "MaxSpread"         "0.4"
+    }
+
+	"weapon_rifle_desert"
+    {
+        "CycleTime"         "0.11"
+        "SpreadPerShot"     "0.4"
+        "MaxSpread"         "0.4"
+    }
+
+    "weapon_rifle_m60"
+    {
+        "CycleTime"         "1.2"
+        "SpreadPerShot"     "0.4"
+        "MaxSpread"         "0.4"
+    }
+
+}

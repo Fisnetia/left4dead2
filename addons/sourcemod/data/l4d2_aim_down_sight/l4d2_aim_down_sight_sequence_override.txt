@@ -38,7 +38,6 @@
 		"Animation"
 		{
 			"ACT_PRIMARY_VM_IDLE_TO_LOWERED" "0"
-			"ACT_VM_FIDGET" "40"
 		}
 	}
 
@@ -76,6 +75,14 @@
 	}
 
 	"weapon_rifle_desert"
+	{
+		"Animation"
+		{
+			"ACT_PRIMARY_VM_IDLE_TO_LOWERED" "0"
+		}
+	}
+
+	"weapon_rifle_m60"
 	{
 		"Animation"
 		{
