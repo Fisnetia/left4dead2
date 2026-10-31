@@ -22,12 +22,12 @@
 
 	"Reason"
 	{
-		"tr"		"[Bitme Nedeni]"
+		"tr"		"[Bitme nedeni]"
 	}
 
 	"Current Map"
 	{
-		"tr"		"Mevcut Harita"
+		"tr"		"Geçerli Harita"
 	}
 
 	"ago"

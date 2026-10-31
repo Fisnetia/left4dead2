@@ -197,7 +197,6 @@
 			"game"					"pf2"
 			"game"					"dystopia"
 			"game"					"treason"
-			"game"					"tf2classified"
 		}
 
 		"Keys"
@@ -255,7 +254,6 @@
 			"game"					"pf2"
 			"game"					"dystopia"
 			"game"					"treason"
-			"game"					"tf2classified"
 		}
 		
 		"Keys"
@@ -322,7 +320,6 @@
 			"game"					"pf2"
 			"game"					"dystopia"
 			"game"					"treason"
-			"game"					"tf2classified"
 		}
 		
 		"Keys"

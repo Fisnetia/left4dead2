@@ -12,7 +12,7 @@
 
 	"Map Already In Vote"
 	{
-		"tr"		"'{1}' adlı harita zaten adaylar listesinde."
+		"tr"		"'{1}' adlı harita zaten Adaylar listesinde."
 	}
 
 	"Map Inserted"
@@ -27,7 +27,7 @@
 
 	"Map Nominated"
 	{
-		"tr"		"{1}, {2} adlı haritayı aday gösterdi."
+		"tr"		"{1} {2}'i aday gösterdi."
 	}
 
 	"Map Nomination Changed"
@@ -42,7 +42,7 @@
 
 	"Can't Nominate Current Map"
 	{
-		"tr"		"Seçtiğiniz haritayı mevcut harita olduğu için aday gösteremezsiniz"
+		"tr"		"Seçtiğiniz haritayı geçerli harita olduğu için aday gösteremezsiniz"
 	}
 
 	"Map in Exclude List"
@@ -52,7 +52,7 @@
 
 	"Current Map"
 	{
-		"tr"		"Mevcut Harita"
+		"tr"		"Geçerli Harita"
 	}
 
 	"Recently Played"
@@ -65,8 +65,4 @@
 		"tr"		"Aday Gösterildi"
 	}
 
-	"Map Not In Pool"
-	{
-		"tr"		"'{1}' adlı harita adaylar seçenekleri arasında bulunamadı."
-	}
 }

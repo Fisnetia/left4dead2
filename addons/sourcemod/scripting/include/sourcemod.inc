@@ -78,14 +78,6 @@ struct Plugin
 #include <commandline>
 #include <entitylump>
 
-typedef Address = int64;
-public const int64 __Int64_Address__ = 0;
-
-/**< Equivallent to nullptr */
-public const Address Address_Null = 0;
-/**< Size of a pointer in bytes (same as `sizeof(void*)`) */
-public const Address Address_PointerSize = 0;
-
 enum APLRes
 {
 	APLRes_Success = 0,     /**< Plugin should load */
@@ -199,8 +191,6 @@ forward void OnMapInit(const char[] mapName);
 
 /**
  * Called when the map is loaded.
- *
- * @note On late load this will be called again.
  */
 forward void OnMapStart();
 
@@ -214,8 +204,8 @@ forward void OnMapEnd();
  * executed, and all plugin configs are done executing.  This is the best
  * place to initialize plugin functions which are based on cvar data.
  *
- * @note This will always be called once and only once per map, after
- *       OnMapStart(). On late load it will be called again.
+ * @note This will always be called once and only once per map.  It will be
+ *       called after OnMapStart().
  */
 forward void OnConfigsExecuted();
 
@@ -264,7 +254,7 @@ methodmap PluginIterator < Handle
 	// Advances the iterator. Returns whether there are more plugins available in the iterator.
 	//
 	// @return              True on more plugins, false otherwise.
-	// @error               Invalid Handle, or called when the iterator is already exhausted.
+	// @error               Invalid Handle.
 	public native bool Next();
 
 	// Returns the current plugin in the iterator.
@@ -735,6 +725,11 @@ enum NumberType
     NumberType_Int32
 };
 
+enum Address
+{
+    Address_Null = 0               // a typical invalid result when an address lookup fails
+};
+
 /**
  * Load up to 4 bytes from a memory address.
  *
@@ -758,26 +753,6 @@ native any LoadFromAddress(Address addr, NumberType size);
  * @error                          Address is null or pointing to reserved memory.
  */
 native void StoreToAddress(Address addr, any data, NumberType size, bool updateMemAccess = true);
-
-/**
- * Load sizeof(void*) from a memory address.
- *
- * @param addr          Address to a memory location.
- * @return              The address that is stored at that address.
- * @error               Address is null or pointing to reserved memory.
- */
-native Address LoadAddressFromAddress(Address addr);
-
-/**
- * Store sizeof(void*) bytes to a memory address.
- *
- * @param addr                     Address to a memory location.
- * @param data                     Address to store at that location.
- * @param updateMemAccess          If true, SourceMod will set read / write / exec permissions
- *                                 on the memory page being written to.
- * @error                          Address is null or pointing to reserved memory.
- */
-native void StoreAddressToAddress(Address addr, Address data, bool updateMemAccess = true);
 
 methodmap FrameIterator < Handle {
 	// Creates a stack frame iterator to build your own stack traces.

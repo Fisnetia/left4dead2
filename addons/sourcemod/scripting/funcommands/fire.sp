@@ -48,11 +48,6 @@ void CreateFireBomb(int client)
 
 void KillFireBomb(int client)
 {
-	if (g_FireBombSerial[client] == 0)
-	{
-		return;
-	}
-
 	g_FireBombSerial[client] = 0;
 
 	if (IsClientInGame(client))
@@ -77,7 +72,7 @@ void PerformBurn(int client, int target, float seconds)
 
 void PerformFireBomb(int client, int target)
 {
-	if (g_FireBombSerial[target] == 0)
+	if (g_FireBombSerial[client] == 0)
 	{
 		CreateFireBomb(target);
 		LogAction(client, target, "\"%L\" set a FireBomb on \"%L\"", client, target);
@@ -85,6 +80,7 @@ void PerformFireBomb(int client, int target)
 	else
 	{
 		KillFireBomb(target);
+		SetEntityRenderColor(client, 255, 255, 255, 255);
 		LogAction(client, target, "\"%L\" removed a FireBomb on \"%L\"", client, target);
 	}
 }
@@ -177,6 +173,7 @@ public Action Timer_FireBomb(Handle timer, any value)
 
 		IgniteEntity(client, g_Cvar_BurnDuration.FloatValue);
 		KillFireBomb(client);
+		SetEntityRenderColor(client, 255, 255, 255, 255);
 		
 		if (g_Cvar_FireBombMode.IntValue > 0)
 		{

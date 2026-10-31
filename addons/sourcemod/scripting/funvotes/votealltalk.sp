@@ -51,9 +51,8 @@ void DisplayVoteAllTalkMenu(int client)
 	g_voteInfo[VOTE_NAME][0] = '\0';
 
 	g_hVoteMenu = new Menu(Handler_VoteCallback, MENU_ACTIONS_ALL);
-
-	bool alltalkValue = g_bIsCSGO ? (g_Cvar_TalkEnemyLiving.BoolValue && g_Cvar_TalkEnemyDead.BoolValue) : g_Cvar_Alltalk.BoolValue;
-	if (alltalkValue)
+	
+	if (g_Cvar_Alltalk.BoolValue)
 	{
 		g_hVoteMenu.SetTitle("Votealltalk Off");
 	}

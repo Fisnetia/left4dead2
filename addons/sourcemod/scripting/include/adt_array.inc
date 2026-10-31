@@ -207,28 +207,19 @@ methodmap ArrayList < Handle {
 	// Returns the index for the first occurrence of the provided string. If
 	// the string cannot be located, -1 will be returned.
 	//
-	// @param item          String to search for.
-	// @param block         Optionally which block to search in.
-	// @param start         Index to start searching from (exclusive), or -1 for direction default.
-	//                      Valid numbers are in the interval [-1..Length].
-	// @param reverse       Whether the search direction should be reversed.
-	// @param caseSensitive If true (default), comparison is case sensitive.
-	//                      If false, comparison is case insensitive.
+	// @param item          String to search for
+	// @param block         Optionally which block to search in
 	// @return              Array index, or -1 on failure
-	// @error               Invalid block, or invalid start index.
-	public native int FindString(const char[] item, int block=0, int start=-1, bool reverse=false, bool caseSensitive=true);
+	public native int FindString(const char[] item, int block=0);
 
 	// Returns the index for the first occurrence of the provided value. If the
 	// value cannot be located, -1 will be returned.
 	//
-	// @param item          Value to search for.
-	// @param block         Optionally which block to search in.
-	// @param start         Index to start searching from (exclusive), or -1 for direction default.
-	//                      Valid numbers are in the interval [-1..Length].
-	// @param reverse       Whether the search direction should be reversed.
-	// @return              Array index, or -1 on failure.
-	// @error               Invalid block, or invalid start index.
-	public native int FindValue(any item, int block=0, int start=-1, bool reverse=false);
+	// @param item          Value to search for
+	// @param block         Optionally which block to search in
+	// @return              Array index, or -1 on failure
+	// @error               Invalid block index
+	public native int FindValue(any item, int block=0);
 
 	// Sort an ADT Array. Specify the type as Integer, Float, or String.
 	//

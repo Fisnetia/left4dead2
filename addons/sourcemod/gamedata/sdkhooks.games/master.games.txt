@@ -227,12 +227,4 @@
 	{
 		"game"		"treason"
 	}
-	"game.tf2classified.txt"
-	{
-		"game"		"tf2classified"
-	}
-	"game.ship.txt"
-	{
-		"game"		"ship"
-	}
 }

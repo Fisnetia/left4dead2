@@ -170,12 +170,9 @@ forward void OnClientCommandKeyValues_Post(int client, KeyValues kv);
 forward void OnClientSettingsChanged(int client);
 
 /**
- * Called after a client's auth ID has been validated.  The state
- * of a client's authorization as an admin is not guaranteed here.
- * Use OnClientPostAdminCheck() if you need a client's admin status.
- * 
- * There may be a delay in receiving this callback if the Steam
- * netowrk is experience downtime or other issues.
+ * Called when a client receives an auth ID.  The state of a client's 
+ * authorization as an admin is not guaranteed here.  Use 
+ * OnClientPostAdminCheck() if you need a client's admin status.
  *
  * This is called by bots, but the ID will be "BOT".
  *

@@ -403,7 +403,7 @@ void SendChatToAdmins(int from, const char[] message)
 void SendDialogToOne(int client, int color, const char[] text, any ...)
 {
 	char message[100];
-	FormatEx(message, sizeof(message), text, ...);
+	VFormat(message, sizeof(message), text, 4);	
 	
 	KeyValues kv = new KeyValues("Stuff", "title", message);
 	kv.SetColor("color", g_Colors[color][0], g_Colors[color][1], g_Colors[color][2], 255);
