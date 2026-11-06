@@ -656,7 +656,9 @@ MRESReturn DhookCallback_ItemPostFrame(int weapon)
 	int clip             = GetEntProp(weapon, Prop_Send, "m_iClip1");
 	float currenttime    = GetGameTime();
 
-	SetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack", currenttime + 100);
+	// Predicted field: writing it every frame causes prediction errors and stutter while moving in ADS.
+	if (GetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack") < currenttime + 50.0)
+		SetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack", currenttime + 100.0);
 
 	static int button;
 	button = GetClientButtons(client);
